@@ -1,7 +1,5 @@
 use std::ops::Mul;
 
-use num_traits::Zero;
-
 
 pub trait StreamIterator {
     type I;
