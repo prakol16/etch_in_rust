@@ -1,0 +1,14 @@
+use streams::stream_defs::{SparseVec, MulStream};
+
+use crate::streams::stream_defs::{FromStreamIterator, IntoStreamIterator};
+
+mod streams;
+
+fn main() {
+    let v1 = SparseVec::from([(1, 4), (20, 2), (33, 3)]);
+    let v2 = SparseVec::from([(1, 7), (2, -3), (5, 10), (33, 9)]);
+    let prod = MulStream::mul(&v1, v2.gallop());
+    let mut result = Vec::with_capacity(v1.len().min(v2.len()));
+    result.extend_from_stream_iterator(prod);
+    println!("{:?}", result);
+}
