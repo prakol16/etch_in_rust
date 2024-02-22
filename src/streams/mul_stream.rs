@@ -28,31 +28,20 @@ pub trait StreamMul<Rhs = Self> {
 
 /// A macro that implements StreamMul for a type given a Mul instance
 macro_rules! impl_stream_mul {
-    ($t:ty) => {
-        impl StreamMul for $t {
-            type Output = $t;
+    ($($t:ty),*) => {
+        $(
+            impl StreamMul for $t {
+                type Output = $t;
 
-            fn mul(self, rhs: $t) -> Self::Output {
-                self * rhs
+                fn mul(self, rhs: $t) -> Self::Output {
+                    self * rhs
+                }
             }
-        }
+        )*
     };
 }
 
-impl_stream_mul!(i8);
-impl_stream_mul!(i16);
-impl_stream_mul!(i32);
-impl_stream_mul!(i64);
-impl_stream_mul!(i128);
-impl_stream_mul!(isize);
-impl_stream_mul!(u8);
-impl_stream_mul!(u16);
-impl_stream_mul!(u32);
-impl_stream_mul!(u64);
-impl_stream_mul!(u128);
-impl_stream_mul!(usize);
-impl_stream_mul!(f32);
-impl_stream_mul!(f64);
+impl_stream_mul!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize, f32, f64);
 
 impl<I, L, R> StreamIterator for MulStream<L, R> 
     where L: StreamIterator<I=I>,

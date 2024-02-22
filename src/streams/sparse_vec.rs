@@ -10,8 +10,8 @@ pub struct SparseVec<T> {
     pub vals: Vec<T>,
 }
 
-impl<T, V: IntoIterator<Item = (usize, T)>> From<V> for SparseVec<T> {
-    fn from(v: V) -> Self {
+impl<T> FromIterator<(usize, T)> for SparseVec<T> {
+    fn from_iter<V: IntoIterator<Item = (usize, T)>>(v: V) -> Self {
         let (inds, vals) = v.into_iter().unzip();
         SparseVec {
             inds,

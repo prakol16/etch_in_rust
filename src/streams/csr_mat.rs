@@ -4,10 +4,34 @@ use super::{sparse_vec::SparseVecIterator, stream_defs::{IntoStreamIterator, Str
 pub struct SparseCSRMat<T> {
     /// The data in the sparse vector
     /// Assumes that the indices are sorted in ascending order
-    pub rows: Vec<usize>,
-    pub cols: Vec<usize>,
+    pub rows: Vec<usize>, // size is #rows + 1; rows[i+1] - rows[i] is the number of non-zero elements in row i
+    pub cols: Vec<usize>, // size is the number of non-zero elements in the matrix, the column index of each non-zero element
     pub vals: Vec<T>,
 }
+
+impl<T> FromIterator<(usize, usize, T)> for SparseCSRMat<T> {
+    fn from_iter<V: IntoIterator<Item = (usize, usize, T)>>(iter: V) -> Self {
+        let mut rows = Vec::new();
+        let mut cols = Vec::new();
+        let mut vals = Vec::new();
+        let mut current_row: Option<usize> = None;
+        let mut row_counts = 0;
+
+        for (row, col, val) in iter {
+            if Some(row) != current_row {
+                rows.push(row_counts);
+                current_row = Some(row);
+            }
+            cols.push(col);
+            vals.push(val);
+            row_counts += 1;
+        }
+        rows.push(row_counts); // Add the final count to rows
+
+        SparseCSRMat { rows, cols, vals }
+    }
+}
+
 
 pub struct SparseCSRMatIterator<'a, T> {
     rows: &'a [usize],

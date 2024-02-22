@@ -1,3 +1,7 @@
+use std::ops::AddAssign;
+
+use num_traits::Zero;
+
 pub trait StreamIterator {
     type I;
     type V;
@@ -60,7 +64,42 @@ pub trait FromStreamIterator {
     fn extend_from_stream_iterator<I: StreamIterator<I=Self::IndexType, V=Self::ValueType>>(&mut self, iter: I);
 }
 
-impl<I: std::cmp::PartialEq, V: std::ops::AddAssign> FromStreamIterator for Vec<(I, V)> {
+pub trait ScalarStream: AddAssign + Zero {}
+
+macro_rules! impl_scalar_stream {
+    ($($t:ty),*) => {
+        $(
+            impl ScalarStream for $t {}
+        )*
+    }
+}
+
+impl_scalar_stream!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize, f32, f64);
+
+impl<V: ScalarStream> FromStreamIterator for V {
+    type IndexType = ();
+    type ValueType = V;
+
+    fn from_stream_iterator<I: StreamIterator<I=Self::IndexType, V=Self::ValueType>>(iter: I) -> Self {
+        let mut result: Self = V::zero();
+        result.extend_from_stream_iterator(iter);
+        result
+    }
+
+    fn extend_from_stream_iterator<I: StreamIterator<I=Self::IndexType, V=Self::ValueType>>(&mut self, mut iter: I) {
+        while iter.valid() {
+            if iter.ready() {
+                let val = iter.value();
+                iter.skip(&(), true);
+                *self += val;
+            } else {
+                iter.skip(&(), false);
+            }
+        }
+    }
+}
+
+impl<I: PartialEq, V: AddAssign> FromStreamIterator for Vec<(I, V)> {
     type IndexType = I;
     type ValueType = V;
 
@@ -81,7 +120,7 @@ impl<I: std::cmp::PartialEq, V: std::ops::AddAssign> FromStreamIterator for Vec<
 
                 match &mut last_pair {
                     Some((last_ind, last_val)) if *last_ind == ind => {
-                        *last_val += val; // Assuming the value type implements the AddAssign trait
+                        *last_val += val;
                     },
                     _ => {
                         if let Some(pair) = last_pair.take() {
