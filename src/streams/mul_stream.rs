@@ -1,5 +1,3 @@
-use std::ops::Mul;
-
 use super::stream_defs::{IntoStreamIterator, StreamIterator};
 
 

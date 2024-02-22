@@ -1,0 +1,64 @@
+use super::{sparse_vec::SparseVecIterator, stream_defs::{IntoStreamIterator, StreamIterator}};
+
+#[derive(Debug, Clone)]
+pub struct SparseCSRMat<T> {
+    /// The data in the sparse vector
+    /// Assumes that the indices are sorted in ascending order
+    pub rows: Vec<usize>,
+    pub cols: Vec<usize>,
+    pub vals: Vec<T>,
+}
+
+pub struct SparseCSRMatIterator<'a, T> {
+    rows: &'a [usize],
+    cols: &'a [usize],
+    vals: &'a [T],
+    cur: usize
+}
+
+impl<'a, T: Clone> StreamIterator for SparseCSRMatIterator<'a, T> {
+    type I = usize;
+    type V = SparseVecIterator<'a, T>;
+
+    fn valid(&self) -> bool {
+        self.cur < self.rows.len() - 1
+    }
+
+    fn ready(&self) -> bool {
+        true
+    }
+
+    fn skip(&mut self, index: &Self::I, strict: bool) {
+        self.cur = if strict && *index == self.cur {
+            *index + 1
+        } else {
+            std::cmp::min(std::cmp::max(self.cur, *index), self.rows.len() - 1)
+        }
+    }
+
+    fn index(&self) -> Self::I {
+        self.cur
+    }
+
+    fn value(&self) -> Self::V {
+        let start = self.rows[self.cur];
+        let end = self.rows[self.cur + 1];
+        SparseVecIterator::new(&self.cols[start..end], &self.vals[start..end])
+    }
+}
+
+impl<'a, T: Clone> IntoStreamIterator for &'a SparseCSRMat<T> {
+    type IndexType = usize;
+    type ValueType = SparseVecIterator<'a, T>;
+    type StreamType = SparseCSRMatIterator<'a, T>;
+
+    fn into_stream_iterator(self) -> Self::StreamType {
+        SparseCSRMatIterator {
+            rows: &self.rows,
+            cols: &self.cols,
+            vals: &self.vals,
+            cur: 0,
+        }
+    }
+}
+

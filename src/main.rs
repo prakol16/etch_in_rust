@@ -17,4 +17,10 @@ fn main() {
     let mut result2 = Vec::with_capacity(v1.len().min(v2.len()).min(v3.len()));
     result2.extend_from_stream_iterator(prod2);
     assert_eq!(result2, vec![(1, -56)]);
+
+    let v4 = SparseVec::from([(3, -2), (10, 5), (20, 5), (33, 7)]);
+    let prod3 = MulStream::mul(&v4, &v1);
+    let mut result3 = SparseVec::with_capacity(v4.len().min(v1.len()));
+    result3.extend_from_stream_iterator(prod3);
+    assert_eq!(result3, SparseVec::from([(20, 10), (33, 21)]));
 }

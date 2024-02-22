@@ -60,7 +60,7 @@ pub trait FromStreamIterator {
     fn extend_from_stream_iterator<I: StreamIterator<I=Self::IndexType, V=Self::ValueType>>(&mut self, iter: I);
 }
 
-impl<I, V> FromStreamIterator for Vec<(I, V)> {
+impl<I: std::cmp::PartialEq, V: std::ops::AddAssign> FromStreamIterator for Vec<(I, V)> {
     type IndexType = I;
     type ValueType = V;
 
@@ -71,15 +71,32 @@ impl<I, V> FromStreamIterator for Vec<(I, V)> {
     }
 
     fn extend_from_stream_iterator<Iter: StreamIterator<I=I, V=V>>(&mut self, mut iter: Iter) {
+        let mut last_pair: Option<(I, V)> = None;
+
         while iter.valid() {
             if iter.ready() {
                 let ind = iter.index();
                 let val = iter.value();
                 iter.skip(&ind, true);
-                self.push((ind, val));
+
+                match &mut last_pair {
+                    Some((last_ind, last_val)) if *last_ind == ind => {
+                        *last_val += val; // Assuming the value type implements the AddAssign trait
+                    },
+                    _ => {
+                        if let Some(pair) = last_pair.take() {
+                            self.push(pair);
+                        }
+                        last_pair = Some((ind, val));
+                    }
+                }
             } else {
                 iter.skip(&iter.index(), false);
             }
+        }
+
+        if let Some(pair) = last_pair {
+            self.push(pair);
         }
     }
 }
