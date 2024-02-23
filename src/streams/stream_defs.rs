@@ -55,6 +55,13 @@ pub trait StreamIterator {
         });
         result
     }
+
+    fn map<O, F: Fn(Self::I, Self::V) -> O>(self, map: F) -> MappedStream<Self, F, O>
+    where
+        Self: Sized
+    {
+        MappedStream::map(self, map)
+    }
 }
 
 pub trait IntoStreamIterator {
@@ -148,4 +155,43 @@ impl<S, F, O> StreamIterator for MappedStream<S, F, O>
     fn value(&self) -> Self::V {
         (self.map)(self.stream.index(), self.stream.value())
     }
+}
+
+/// A stream iterator that produces a dense stream of values at every index
+pub struct DenseStreamIterator<S> {
+    index: usize,
+    stream: S
+}
+
+impl<S> DenseStreamIterator<S> {
+    pub fn from_stream_iterator(stream: S) -> Self {
+        DenseStreamIterator { index: 0, stream }
+    }
+}
+
+impl<S> Iterator for DenseStreamIterator<S>
+    where S: StreamIterator<I = usize>,
+          S::V: Zero
+{
+    type Item = S::V;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.stream.valid() {
+            let i = self.stream.index();
+            if self.index < i {
+                self.index += 1;
+                Some(S::V::zero())
+            } else if self.stream.ready() {
+                self.index += 1;
+                let v = self.stream.value();
+                self.stream.seek(&i, true);
+                Some(v)
+            } else {
+                self.stream.seek(&self.index, false);
+                None
+            }
+        } else {
+            None
+        }
+    }    
 }
