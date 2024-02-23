@@ -76,8 +76,8 @@ impl<L, R> StreamIterator for MulFunStream<L, R>
         self.left.ready()
     }
 
-    fn skip(&mut self, index: &Self::I, strict: bool) {
-        self.left.skip(index, strict);
+    fn seek(&mut self, index: &Self::I, strict: bool) {
+        self.left.seek(index, strict);
     }
 
     fn index(&self) -> Self::I {
@@ -129,9 +129,9 @@ impl<I, L, R> StreamIterator for MulStream<L, R>
         self.left.ready() && self.right.ready() && self.left.index() == self.right.index()
     }
 
-    fn skip(&mut self, index: &I, strict: bool) {
-        self.left.skip(index, strict);
-        self.right.skip(index, strict);
+    fn seek(&mut self, index: &I, strict: bool) {
+        self.left.seek(index, strict);
+        self.right.seek(index, strict);
     }
 
     fn index(&self) -> I {

@@ -47,9 +47,9 @@ impl<I, L, R> StreamIterator for AddStream<L, R>
         }
     }
 
-    fn skip(&mut self, index: &I, strict: bool) {
-        self.left.skip(index, strict);
-        self.right.skip(index, strict);
+    fn seek(&mut self, index: &I, strict: bool) {
+        self.left.seek(index, strict);
+        self.right.seek(index, strict);
     }
 
     fn index(&self) -> I {

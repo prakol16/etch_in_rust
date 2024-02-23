@@ -18,7 +18,7 @@ pub trait StreamIterator {
     /// INVARIANT: will only be called when `valid` is true
     /// RULE (for termination): whenever (index, strict) >= (self.index(), self.ready()),
     /// (in the lexicographic order with false < true), then progress is made
-    fn skip(&mut self, index: &Self::I, strict: bool);
+    fn seek(&mut self, index: &Self::I, strict: bool);
 
     /// Emit the current index of the stream
     /// INVARIANT: will only be called when `valid` is true
@@ -36,10 +36,10 @@ pub trait StreamIterator {
             let i = self.index();
             if self.ready() {
                 let v = self.value();
-                self.skip(&i, true);
+                self.seek(&i, true);
                 f(i, v);
             } else {
-                self.skip(&i, false);
+                self.seek(&i, false);
             }
         }
     }
@@ -137,8 +137,8 @@ impl<S, F, O> StreamIterator for MappedStream<S, F, O>
         self.stream.ready()
     }
 
-    fn skip(&mut self, index: &Self::I, strict: bool) {
-        self.stream.skip(index, strict);
+    fn seek(&mut self, index: &Self::I, strict: bool) {
+        self.stream.seek(index, strict);
     }
 
     fn index(&self) -> Self::I {

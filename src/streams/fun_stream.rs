@@ -12,13 +12,13 @@ pub trait FunStream {
 
 #[derive(Debug, Clone)]
 pub struct Broadcast<I, V> {
-    data: PhantomData<I>,
+    index: PhantomData<I>,
     pub value: V
 }
 
 impl<I, V> Broadcast<I, V> {
     pub fn new(value: V) -> Self {
-        Broadcast { value, data: PhantomData }
+        Broadcast { value, index: PhantomData }
     }
 }
 

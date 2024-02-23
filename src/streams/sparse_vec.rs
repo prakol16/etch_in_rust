@@ -83,7 +83,7 @@ impl<T: Clone> StreamIterator for SparseVecGalloper<'_, T> {
         true
     }
 
-    fn skip(&mut self, index: &usize, strict: bool) {
+    fn seek(&mut self, index: &usize, strict: bool) {
         // Do a binary search to find the first element >= index (or > index if strict)
         let mut left = self.cur;
         let mut right = self.inds.len();
@@ -119,7 +119,7 @@ impl<T: Clone> StreamIterator for SparseVecIterator<'_, T> {
         true
     }
 
-    fn skip(&mut self, index: &usize, strict: bool) {
+    fn seek(&mut self, index: &usize, strict: bool) {
         while self.inds[self.cur] < *index || (strict && self.inds[self.cur] == *index) {
             self.cur += 1;
             if self.cur >= self.inds.len() {

@@ -52,7 +52,7 @@ impl<'a, T: Clone> StreamIterator for SparseCSRMatIterator<'a, T> {
         true
     }
 
-    fn skip(&mut self, index: &Self::I, strict: bool) {
+    fn seek(&mut self, index: &Self::I, strict: bool) {
         self.cur = if strict && *index == self.cur {
             *index + 1
         } else {
