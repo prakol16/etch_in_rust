@@ -43,12 +43,14 @@ impl<T> SparseVec<T> {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct SparseVecGalloper<'a, T> {
     inds: &'a [usize],
     vals: &'a [T],
     cur: usize
 }
 
+#[derive(Debug, Clone)]
 pub struct SparseVecIterator<'a, T> {
     inds: &'a [usize],
     vals: &'a [T],
@@ -172,33 +174,10 @@ impl<T: std::ops::AddAssign + Default + Clone> FromStreamIterator for SparseVec<
         result
     }
 
-    fn extend_from_stream_iterator<Iter: StreamIterator<I=usize, V=T>>(&mut self, mut iter: Iter) {
-        while iter.valid() {
-            if iter.ready() {
-                let ind = iter.index();
-                let val = iter.value();
-                iter.skip(&ind, true);
-
-                // Check if the current index matches the last index in the SparseVec
-                if let Some(last_ind) = self.inds.last() {
-                    if *last_ind == ind {
-                        // If so, add the value to the last value in the SparseVec
-                        if let Some(last_val) = self.vals.last_mut() {
-                            *last_val += val;
-                        }
-                    } else {
-                        // Otherwise, push the new index and value
-                        self.inds.push(ind);
-                        self.vals.push(val);
-                    }
-                } else {
-                    // If the SparseVec is empty, just push the new index and value
-                    self.inds.push(ind);
-                    self.vals.push(val);
-                }
-            } else {
-                iter.skip(&iter.index(), false);
-            }
-        }
+    fn extend_from_stream_iterator<Iter: StreamIterator<I=usize, V=T>>(&mut self, iter: Iter) {
+        iter.for_each(|i, v| {
+            self.inds.push(i);
+            self.vals.push(v);
+        });
     }
 }

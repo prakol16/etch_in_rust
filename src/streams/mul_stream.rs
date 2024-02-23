@@ -1,4 +1,4 @@
-use super::stream_defs::{IntoStreamIterator, StreamIterator};
+use super::{fun_stream::{Broadcast, FunStream}, stream_defs::{IntoStreamIterator, StreamIterator}};
 
 
 pub struct MulStream<L, R> {
@@ -42,6 +42,76 @@ macro_rules! impl_stream_mul {
 }
 
 impl_stream_mul!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize, f32, f64);
+
+impl<L, R> StreamMul<R> for L
+    where L: StreamIterator,
+          R: StreamIterator<I=L::I>,
+          L::V: StreamMul<R::V> {
+    type Output = MulStream<L, R>;
+
+    fn mul(self, rhs: R) -> Self::Output {
+        MulStream::mul(self, rhs)
+    }
+}
+
+/// A stream that multiplies an ordinary stream and a functional (expanded) stream
+/// by simply multiplying the values the ordinary stream produces with the right-hand stream
+pub struct MulFunStream<L, R> {
+    left: L,
+    right: R,
+}
+
+impl<L, R> StreamIterator for MulFunStream<L, R>
+    where L: StreamIterator,
+          R: FunStream<I=L::I>,
+          L::V: StreamMul<R::V> {
+    type I = L::I;
+    type V = <L::V as StreamMul<R::V>>::Output;
+
+    fn valid(&self) -> bool {
+        self.left.valid()    
+    }
+
+    fn ready(&self) -> bool {
+        self.left.ready()
+    }
+
+    fn skip(&mut self, index: &Self::I, strict: bool) {
+        self.left.skip(index, strict);
+    }
+
+    fn index(&self) -> Self::I {
+        self.left.index()
+    }
+
+    fn value(&self) -> Self::V {
+        self.left.value().mul(self.right.value(&self.index()))
+    }
+}
+
+impl<L, R> StreamMul<Broadcast<L::I, R>> for L
+    where L: StreamIterator,
+          L::V: StreamMul<R> {
+    type Output = MulFunStream<L, Broadcast<L::I, R>>;
+
+    fn mul(self, rhs: Broadcast<L::I, R>) -> Self::Output {
+        MulFunStream {
+            left: self,
+            right: rhs,
+        }
+    }
+}
+
+// impl<L, R> StreamMul<R> for L
+//     where L: StreamIterator,
+//           R: FunStream<I=L::I>,
+//           L::V: StreamMul<R::V> {
+//     type Output = impl StreamIterator;
+
+//     fn mul(self, rhs: R) -> Self::Output {
+//         MappedStream::map(self, |i, v| v.mul(rhs.value(&i)))
+//     }
+// }
 
 impl<I, L, R> StreamIterator for MulStream<L, R> 
     where L: StreamIterator<I=I>,

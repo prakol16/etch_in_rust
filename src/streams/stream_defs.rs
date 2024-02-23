@@ -1,4 +1,4 @@
-use std::ops::AddAssign;
+use std::{marker::PhantomData, ops::AddAssign};
 
 use num_traits::Zero;
 
@@ -27,6 +27,34 @@ pub trait StreamIterator {
     /// Emit the current value of the stream
     /// INVARIANT: will only be called when `valid` and `ready` are true
     fn value(&self) -> Self::V;
+
+    fn for_each(mut self, mut f: impl FnMut(Self::I, Self::V))
+    where
+        Self: Sized
+    {
+        while self.valid() {
+            let i = self.index();
+            if self.ready() {
+                let v = self.value();
+                self.skip(&i, true);
+                f(i, v);
+            } else {
+                self.skip(&i, false);
+            }
+        }
+    }
+
+    fn contract(self) -> Self::V
+    where
+        Self: Sized,
+        Self::V: AddAssign + Zero
+    {
+        let mut result = Self::V::zero();
+        self.for_each(|_, v| {
+            result += v
+        });
+        result
+    }
 }
 
 pub trait IntoStreamIterator {
@@ -64,42 +92,7 @@ pub trait FromStreamIterator {
     fn extend_from_stream_iterator<I: StreamIterator<I=Self::IndexType, V=Self::ValueType>>(&mut self, iter: I);
 }
 
-pub trait ScalarStream: AddAssign + Zero {}
-
-macro_rules! impl_scalar_stream {
-    ($($t:ty),*) => {
-        $(
-            impl ScalarStream for $t {}
-        )*
-    }
-}
-
-impl_scalar_stream!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize, f32, f64);
-
-impl<V: ScalarStream> FromStreamIterator for V {
-    type IndexType = ();
-    type ValueType = V;
-
-    fn from_stream_iterator<I: StreamIterator<I=Self::IndexType, V=Self::ValueType>>(iter: I) -> Self {
-        let mut result: Self = V::zero();
-        result.extend_from_stream_iterator(iter);
-        result
-    }
-
-    fn extend_from_stream_iterator<I: StreamIterator<I=Self::IndexType, V=Self::ValueType>>(&mut self, mut iter: I) {
-        while iter.valid() {
-            if iter.ready() {
-                let val = iter.value();
-                iter.skip(&(), true);
-                *self += val;
-            } else {
-                iter.skip(&(), false);
-            }
-        }
-    }
-}
-
-impl<I: PartialEq, V: AddAssign> FromStreamIterator for Vec<(I, V)> {
+impl<I, V> FromStreamIterator for Vec<(I, V)> {
     type IndexType = I;
     type ValueType = V;
 
@@ -109,35 +102,50 @@ impl<I: PartialEq, V: AddAssign> FromStreamIterator for Vec<(I, V)> {
         result
     }
 
-    fn extend_from_stream_iterator<Iter: StreamIterator<I=I, V=V>>(&mut self, mut iter: Iter) {
-        let mut last_pair: Option<(I, V)> = None;
-
-        while iter.valid() {
-            if iter.ready() {
-                let ind = iter.index();
-                let val = iter.value();
-                iter.skip(&ind, true);
-
-                match &mut last_pair {
-                    Some((last_ind, last_val)) if *last_ind == ind => {
-                        *last_val += val;
-                    },
-                    _ => {
-                        if let Some(pair) = last_pair.take() {
-                            self.push(pair);
-                        }
-                        last_pair = Some((ind, val));
-                    }
-                }
-            } else {
-                iter.skip(&iter.index(), false);
-            }
-        }
-
-        if let Some(pair) = last_pair {
-            self.push(pair);
-        }
+    fn extend_from_stream_iterator<Iter: StreamIterator<I=I, V=V>>(&mut self, iter: Iter) {
+        iter.for_each(|i, v| {
+            self.push((i, v));
+        });
     }
 }
 
+pub struct MappedStream<S, F, O> {
+    stream: S,
+    map: F,
+    _output: PhantomData<O>
+}
 
+impl<S, F, O> MappedStream<S, F, O>
+        where S: StreamIterator,
+        F: Fn(S::I, S::V) -> O {
+    pub fn map(stream: S, map: F) -> Self {
+        MappedStream { stream, map, _output: PhantomData }
+    }
+}
+
+impl<S, F, O> StreamIterator for MappedStream<S, F, O>
+    where S: StreamIterator,
+          F: Fn(S::I, S::V) -> O {
+    type I = S::I;
+    type V = O;
+
+    fn valid(&self) -> bool {
+        self.stream.valid()
+    }
+
+    fn ready(&self) -> bool {
+        self.stream.ready()
+    }
+
+    fn skip(&mut self, index: &Self::I, strict: bool) {
+        self.stream.skip(index, strict);
+    }
+
+    fn index(&self) -> Self::I {
+        self.stream.index()
+    }
+
+    fn value(&self) -> Self::V {
+        (self.map)(self.stream.index(), self.stream.value())
+    }
+}

@@ -1,6 +1,6 @@
 use super::{sparse_vec::SparseVecIterator, stream_defs::{IntoStreamIterator, StreamIterator}};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SparseCSRMat<T> {
     /// The data in the sparse vector
     /// Assumes that the indices are sorted in ascending order
@@ -32,7 +32,7 @@ impl<T> FromIterator<(usize, usize, T)> for SparseCSRMat<T> {
     }
 }
 
-
+#[derive(Debug, Clone)]
 pub struct SparseCSRMatIterator<'a, T> {
     rows: &'a [usize],
     cols: &'a [usize],
