@@ -1,4 +1,4 @@
-use super::{fun_stream::{Broadcast, FunStream}, stream_defs::{IntoStreamIterator, StreamIterator}};
+use super::{fun_stream::{Expand, FunStream}, stream_defs::{IntoStreamIterator, StreamIterator}};
 
 
 pub struct MulStream<L, R> {
@@ -89,12 +89,12 @@ impl<L, R> StreamIterator for MulFunStream<L, R>
     }
 }
 
-impl<L, R> StreamMul<Broadcast<L::I, R>> for L
+impl<L, R> StreamMul<Expand<L::I, R>> for L
     where L: StreamIterator,
           L::V: StreamMul<R> {
-    type Output = MulFunStream<L, Broadcast<L::I, R>>;
+    type Output = MulFunStream<L, Expand<L::I, R>>;
 
-    fn mul(self, rhs: Broadcast<L::I, R>) -> Self::Output {
+    fn mul(self, rhs: Expand<L::I, R>) -> Self::Output {
         MulFunStream {
             left: self,
             right: rhs,

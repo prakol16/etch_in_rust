@@ -1,5 +1,5 @@
 use crate::streams::csr_mat::SparseCSRMat;
-use crate::streams::fun_stream::Broadcast;
+use crate::streams::fun_stream::Expand;
 use crate::streams::mul_stream::StreamMul;
 use crate::streams::sparse_vec::SparseVec;
 
@@ -36,7 +36,7 @@ fn main() {
     let mat1 = SparseCSRMat::from_iter([(0, 0, 1), (0, 1, 2), (1, 5, 3), (1, 29, 4)]);
     let prod4 = StreamMul::mul(
         mat1.into_stream_iterator(),
-        Broadcast::new(v3.into_stream_iterator())        
+        Expand::new(v3.into_stream_iterator())        
     );
     let sum2 = MappedStream::map(prod4, |_i, v| v.contract());
     let result5: SparseVec<i32> = SparseVec::from_stream_iterator(sum2);

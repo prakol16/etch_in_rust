@@ -11,18 +11,18 @@ pub trait FunStream {
 }
 
 #[derive(Debug, Clone)]
-pub struct Broadcast<I, V> {
+pub struct Expand<I, V> {
     index: PhantomData<I>,
     pub value: V
 }
 
-impl<I, V> Broadcast<I, V> {
+impl<I, V> Expand<I, V> {
     pub fn new(value: V) -> Self {
-        Broadcast { value, index: PhantomData }
+        Expand { value, index: PhantomData }
     }
 }
 
-impl<I, V: Clone> FunStream for Broadcast<I, V> {
+impl<I, V: Clone> FunStream for Expand<I, V> {
     type I = I;
     type V = V;
 
