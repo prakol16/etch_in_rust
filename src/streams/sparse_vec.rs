@@ -174,7 +174,7 @@ impl<T: std::ops::AddAssign + Default + Clone> FromStreamIterator for SparseVec<
         result
     }
 
-    fn extend_from_stream_iterator<Iter: IndexedStream<I=usize, V=T>>(&mut self, mut iter: Iter) {
+    fn extend_from_stream_iterator<Iter: IndexedStream<I=usize, V=T>>(&mut self, iter: Iter) {
         iter.for_each(|i, v| {
             self.inds.push(i);
             self.vals.push(v);

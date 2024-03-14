@@ -2,6 +2,8 @@ use std::{convert::Infallible, marker::PhantomData, ops::{AddAssign, ControlFlow
 
 use num_traits::Zero;
 
+use super::zip_stream::ZipStream;
+
 pub trait IndexedStream {
     type I;
     type V;
@@ -19,14 +21,6 @@ pub trait IndexedStream {
     /// RULE (for termination): whenever (index, strict) >= (self.index(), self.ready()),
     /// (in the lexicographic order with false < true), then progress is made
     fn seek(&mut self, index: &Self::I, strict: bool);
-
-    /// A specialization of `seek` where index is the current index of the stream
-    /// and strict is the current ready() value of the stream.
-    /// Will only be called when `valid` is true.
-    /// A default impelementation is given but can be overridden with more efficient implementations
-    fn next(&mut self) {
-        self.seek(&self.index(), self.ready());
-    }
 
     /// Emit the current index of the stream.
     /// Will only be called when `valid` is true
@@ -72,8 +66,9 @@ pub trait IndexedStream {
         Self: Sized,
         F: FnMut(B, Self::I, Self::V) -> B
     {
-        match self.try_fold(init, |acc, i, v| 
-            ControlFlow::<Infallible, B>::Continue(f(acc, i, v))) {
+        match self.try_fold(init, 
+            |acc, i, v| ControlFlow::<Infallible, B>::Continue(f(acc, i, v))
+        ) {
                 ControlFlow::Continue(x) => x,
                 ControlFlow::Break(x) => match x {}
         }
@@ -113,6 +108,13 @@ pub trait IndexedStream {
         Self: Sized
     {
         MappedStream::map(self, map)
+    }
+
+    fn zip_with<R: IndexedStream<I = Self::I>, O, F: Fn(Self::V, R::V) -> O>(self, right: R, f: F) -> ZipStream<Self, R, F>
+    where
+        Self: Sized
+    {
+        ZipStream::new(self, right, f)
     }
 }
 
@@ -210,6 +212,7 @@ impl<S, F, O> IndexedStream for MappedStream<S, F, O>
 }
 
 /// A stream iterator that produces a dense stream of values at every index
+/// filling in values with a default zero value if now value is provided
 pub struct DenseStreamIterator<S> {
     index: usize,
     stream: S
