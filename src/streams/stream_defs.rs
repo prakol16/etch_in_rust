@@ -9,27 +9,35 @@ pub trait IndexedStream {
     /// Determines if the stream has been exhausted.
     fn valid(&self) -> bool;
 
-    /// Determines if the stream should yield an element in its current state
+    /// Determines if the stream should yield an element in its current state.
     /// Will only be called when `valid` is true
     fn ready(&self) -> bool;
 
     /// Requests the stream to advance as far as possible up to `index`
     /// If `strict` is true, skipping `index` itself is permissible
-    /// INVARIANT: will only be called when `valid` is true
+    /// Will only be called when `valid` is true
     /// RULE (for termination): whenever (index, strict) >= (self.index(), self.ready()),
     /// (in the lexicographic order with false < true), then progress is made
     fn seek(&mut self, index: &Self::I, strict: bool);
 
-    /// Emit the current index of the stream
-    /// INVARIANT: will only be called when `valid` is true
+    /// A specialization of `seek` where index is the current index of the stream
+    /// and strict is the current ready() value of the stream.
+    /// Will only be called when `valid` is true.
+    /// A default impelementation is given but can be overridden with more efficient implementations
+    fn next(&mut self) {
+        self.seek(&self.index(), self.ready());
+    }
+
+    /// Emit the current index of the stream.
+    /// Will only be called when `valid` is true
     fn index(&self) -> Self::I;
 
-    /// Emit the current value of the stream
-    /// INVARIANT: will only be called when `valid` and `ready` are true
+    /// Emit the current value of the stream.
+    /// Will only be called when `valid` and `ready` are true
     fn value(&self) -> Self::V;
 
-    /// Get the value of the stream by folding over it
-    /// A default implementation is given
+    /// Get the value of the stream by folding over it.
+    /// A default implementation is given.
     /// Stream combinators can override with more efficient implementations
     /// using child `try_fold` implementations.
     /// Note that `try_fold` should work even if the stream is resumed from
@@ -59,19 +67,10 @@ pub trait IndexedStream {
         self.try_fold((), |(), i, v| f(i, v))
     }
 
-    fn for_each(&mut self, mut f: impl FnMut(Self::I, Self::V))
+    fn fold<B, F>(mut self, init: B, mut f: F) -> B
     where
-        Self: Sized
-    {
-        self.try_for_each(|i, v| {
-            f(i, v);
-            ControlFlow::<Infallible, ()>::Continue(())
-        });
-    }
-
-    fn fold<B, F>(&mut self, init: B, f: F) -> B
-    where
-        F: Fn(B, Self::I, Self::V) -> B
+        Self: Sized,
+        F: FnMut(B, Self::I, Self::V) -> B
     {
         match self.try_fold(init, |acc, i, v| 
             ControlFlow::<Infallible, B>::Continue(f(acc, i, v))) {
@@ -80,7 +79,14 @@ pub trait IndexedStream {
         }
     }
 
-    fn contract(mut self) -> Self::V
+    fn for_each(self, mut f: impl FnMut(Self::I, Self::V))
+    where
+        Self: Sized
+    {
+        self.fold((), |(), i, v| f(i, v))
+    }
+
+    fn contract(self) -> Self::V
     where
         Self: Sized,
         Self::V: AddAssign + Zero
@@ -155,7 +161,7 @@ impl<I, V> FromStreamIterator for Vec<(I, V)> {
         result
     }
 
-    fn extend_from_stream_iterator<Iter: IndexedStream<I=I, V=V>>(&mut self, mut iter: Iter) {
+    fn extend_from_stream_iterator<Iter: IndexedStream<I=I, V=V>>(&mut self, iter: Iter) {
         iter.for_each(|i, v| {
             self.push((i, v));
         });
