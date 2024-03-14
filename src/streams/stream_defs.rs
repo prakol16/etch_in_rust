@@ -2,7 +2,7 @@ use std::{convert::Infallible, marker::PhantomData, ops::{AddAssign, ControlFlow
 
 use num_traits::Zero;
 
-pub trait IndexedIterator {
+pub trait IndexedStream {
     type I;
     type V;
 
@@ -118,12 +118,12 @@ pub trait IntoStreamIterator {
     type ValueType;
 
     /// The stream type
-    type StreamType: IndexedIterator<I=Self::IndexType, V=Self::ValueType>;
+    type StreamType: IndexedStream<I=Self::IndexType, V=Self::ValueType>;
 
     fn into_stream_iterator(self) -> Self::StreamType;
 }
 
-impl<S: IndexedIterator> IntoStreamIterator for S {
+impl<S: IndexedStream> IntoStreamIterator for S {
     type IndexType = S::I;
     type ValueType = S::V;
     type StreamType = S;
@@ -140,22 +140,22 @@ pub trait FromStreamIterator {
     /// The value type of the stream iterator that can produce T
     type ValueType;
 
-    fn from_stream_iterator<I: IndexedIterator<I=Self::IndexType, V=Self::ValueType>>(iter: I) -> Self;
+    fn from_stream_iterator<I: IndexedStream<I=Self::IndexType, V=Self::ValueType>>(iter: I) -> Self;
 
-    fn extend_from_stream_iterator<I: IndexedIterator<I=Self::IndexType, V=Self::ValueType>>(&mut self, iter: I);
+    fn extend_from_stream_iterator<I: IndexedStream<I=Self::IndexType, V=Self::ValueType>>(&mut self, iter: I);
 }
 
 impl<I, V> FromStreamIterator for Vec<(I, V)> {
     type IndexType = I;
     type ValueType = V;
 
-    fn from_stream_iterator<Iter: IndexedIterator<I=I, V=V>>(iter: Iter) -> Self {
+    fn from_stream_iterator<Iter: IndexedStream<I=I, V=V>>(iter: Iter) -> Self {
         let mut result = Vec::new();
         result.extend_from_stream_iterator(iter);
         result
     }
 
-    fn extend_from_stream_iterator<Iter: IndexedIterator<I=I, V=V>>(&mut self, mut iter: Iter) {
+    fn extend_from_stream_iterator<Iter: IndexedStream<I=I, V=V>>(&mut self, mut iter: Iter) {
         iter.for_each(|i, v| {
             self.push((i, v));
         });
@@ -169,15 +169,15 @@ pub struct MappedStream<S, F, O> {
 }
 
 impl<S, F, O> MappedStream<S, F, O>
-        where S: IndexedIterator,
+        where S: IndexedStream,
         F: Fn(S::I, S::V) -> O {
     pub fn map(stream: S, map: F) -> Self {
         MappedStream { stream, map, _output: PhantomData }
     }
 }
 
-impl<S, F, O> IndexedIterator for MappedStream<S, F, O>
-    where S: IndexedIterator,
+impl<S, F, O> IndexedStream for MappedStream<S, F, O>
+    where S: IndexedStream,
           F: Fn(S::I, S::V) -> O {
     type I = S::I;
     type V = O;
@@ -216,7 +216,7 @@ impl<S> DenseStreamIterator<S> {
 }
 
 impl<S> Iterator for DenseStreamIterator<S>
-    where S: IndexedIterator<I = usize>,
+    where S: IndexedStream<I = usize>,
           S::V: Zero
 {
     type Item = S::V;

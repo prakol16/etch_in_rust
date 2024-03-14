@@ -10,7 +10,7 @@ mod test {
     use crate::streams::stream_defs::DenseStreamIterator;
     use crate::streams::stream_defs::IntoStreamIterator;
     use crate::streams::stream_defs::FromStreamIterator;
-    use crate::streams::stream_defs::IndexedIterator;
+    use crate::streams::stream_defs::IndexedStream;
     
     #[test]
     fn test_gallop() {
