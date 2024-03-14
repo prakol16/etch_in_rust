@@ -1,6 +1,6 @@
 use std::ops::Add;
 
-use super::stream_defs::{IntoStreamIterator, StreamIterator};
+use super::stream_defs::{IntoStreamIterator, IndexedIterator};
 
 
 pub struct AddStream<L, R> {
@@ -21,9 +21,9 @@ impl<L, R> AddStream<L, R> {
     }
 }
 
-impl<I, L, R> StreamIterator for AddStream<L, R> 
-    where L: StreamIterator<I=I>,
-          R: StreamIterator<I=I>,
+impl<I, L, R> IndexedIterator for AddStream<L, R> 
+    where L: IndexedIterator<I=I>,
+          R: IndexedIterator<I=I>,
           I: Ord,
           L::V: Add<R::V>, {
     type I = I;

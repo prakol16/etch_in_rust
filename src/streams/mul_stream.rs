@@ -1,4 +1,4 @@
-use super::{fun_stream::{Expand, FunStream}, stream_defs::{IntoStreamIterator, StreamIterator}};
+use super::{fun_stream::{Expand, FunStream}, stream_defs::{IntoStreamIterator, IndexedIterator}};
 
 
 pub struct MulStream<L, R> {
@@ -44,8 +44,8 @@ macro_rules! impl_stream_mul {
 impl_stream_mul!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize, f32, f64);
 
 impl<L, R> StreamMul<R> for L
-    where L: StreamIterator,
-          R: StreamIterator<I=L::I>,
+    where L: IndexedIterator,
+          R: IndexedIterator<I=L::I>,
           L::V: StreamMul<R::V> {
     type Output = MulStream<L, R>;
 
@@ -61,8 +61,8 @@ pub struct MulFunStream<L, R> {
     right: R,
 }
 
-impl<L, R> StreamIterator for MulFunStream<L, R>
-    where L: StreamIterator,
+impl<L, R> IndexedIterator for MulFunStream<L, R>
+    where L: IndexedIterator,
           R: FunStream<I=L::I>,
           L::V: StreamMul<R::V> {
     type I = L::I;
@@ -90,7 +90,7 @@ impl<L, R> StreamIterator for MulFunStream<L, R>
 }
 
 impl<L, R> StreamMul<Expand<L::I, R>> for L
-    where L: StreamIterator,
+    where L: IndexedIterator,
           L::V: StreamMul<R> {
     type Output = MulFunStream<L, Expand<L::I, R>>;
 
@@ -113,9 +113,9 @@ impl<L, R> StreamMul<Expand<L::I, R>> for L
 //     }
 // }
 
-impl<I, L, R> StreamIterator for MulStream<L, R> 
-    where L: StreamIterator<I=I>,
-          R: StreamIterator<I=I>,
+impl<I, L, R> IndexedIterator for MulStream<L, R> 
+    where L: IndexedIterator<I=I>,
+          R: IndexedIterator<I=I>,
           I: Ord,
           L::V: StreamMul<R::V>, {
     type I = I;

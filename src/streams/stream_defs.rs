@@ -1,8 +1,8 @@
-use std::{marker::PhantomData, ops::AddAssign};
+use std::{convert::Infallible, marker::PhantomData, ops::{AddAssign, ControlFlow}};
 
 use num_traits::Zero;
 
-pub trait StreamIterator {
+pub trait IndexedIterator {
     type I;
     type V;
 
@@ -28,32 +28,78 @@ pub trait StreamIterator {
     /// INVARIANT: will only be called when `valid` and `ready` are true
     fn value(&self) -> Self::V;
 
-    fn for_each(mut self, mut f: impl FnMut(Self::I, Self::V))
-    where
-        Self: Sized
+    /// Get the value of the stream by folding over it
+    /// A default implementation is given
+    /// Stream combinators can override with more efficient implementations
+    /// using child `try_fold` implementations.
+    /// Note that `try_fold` should work even if the stream is resumed from
+    /// some state other than the beginning, and it may not consume the entire stream either
+    /// if it encounters an intermediate `break`.
+    fn try_fold<B, F, R>(&mut self, init: B, mut f: F) -> ControlFlow<R, B> where
+        F: FnMut(B, Self::I, Self::V) -> ControlFlow<R, B>
     {
+        let mut acc = init;
         while self.valid() {
             let i = self.index();
             if self.ready() {
                 let v = self.value();
                 self.seek(&i, true);
-                f(i, v);
+                acc = f(acc, i, v)?;
             } else {
                 self.seek(&i, false);
             }
         }
+        ControlFlow::Continue(acc)
     }
 
-    fn contract(self) -> Self::V
+    fn try_for_each<R>(&mut self, mut f: impl FnMut(Self::I, Self::V) -> ControlFlow<R>) -> ControlFlow<R>
+    where
+        Self: Sized
+    {
+        self.try_fold((), |(), i, v| f(i, v))
+    }
+
+    fn for_each(&mut self, mut f: impl FnMut(Self::I, Self::V))
+    where
+        Self: Sized
+    {
+        self.try_for_each(|i, v| {
+            f(i, v);
+            ControlFlow::<Infallible, ()>::Continue(())
+        });
+    }
+
+    fn fold<B, F>(&mut self, init: B, f: F) -> B
+    where
+        F: Fn(B, Self::I, Self::V) -> B
+    {
+        match self.try_fold(init, |acc, i, v| 
+            ControlFlow::<Infallible, B>::Continue(f(acc, i, v))) {
+                ControlFlow::Continue(x) => x,
+                ControlFlow::Break(x) => match x {}
+        }
+    }
+
+    fn contract(mut self) -> Self::V
     where
         Self: Sized,
         Self::V: AddAssign + Zero
     {
-        let mut result = Self::V::zero();
-        self.for_each(|_, v| {
-            result += v
-        });
-        result
+        self.fold(Self::V::zero(), |acc, _, v| acc + v)
+    }
+
+    fn any_nonzero(mut self) -> bool
+    where
+        Self: Sized,
+        Self::V: Zero + PartialEq
+    {
+        self.try_for_each(|_, v| 
+            if v != Self::V::zero() {
+                ControlFlow::Break(())
+            } else {
+                ControlFlow::Continue(())
+            }
+        ).is_break()
     }
 
     fn map<O, F: Fn(Self::I, Self::V) -> O>(self, map: F) -> MappedStream<Self, F, O>
@@ -72,12 +118,12 @@ pub trait IntoStreamIterator {
     type ValueType;
 
     /// The stream type
-    type StreamType: StreamIterator<I=Self::IndexType, V=Self::ValueType>;
+    type StreamType: IndexedIterator<I=Self::IndexType, V=Self::ValueType>;
 
     fn into_stream_iterator(self) -> Self::StreamType;
 }
 
-impl<S: StreamIterator> IntoStreamIterator for S {
+impl<S: IndexedIterator> IntoStreamIterator for S {
     type IndexType = S::I;
     type ValueType = S::V;
     type StreamType = S;
@@ -94,22 +140,22 @@ pub trait FromStreamIterator {
     /// The value type of the stream iterator that can produce T
     type ValueType;
 
-    fn from_stream_iterator<I: StreamIterator<I=Self::IndexType, V=Self::ValueType>>(iter: I) -> Self;
+    fn from_stream_iterator<I: IndexedIterator<I=Self::IndexType, V=Self::ValueType>>(iter: I) -> Self;
 
-    fn extend_from_stream_iterator<I: StreamIterator<I=Self::IndexType, V=Self::ValueType>>(&mut self, iter: I);
+    fn extend_from_stream_iterator<I: IndexedIterator<I=Self::IndexType, V=Self::ValueType>>(&mut self, iter: I);
 }
 
 impl<I, V> FromStreamIterator for Vec<(I, V)> {
     type IndexType = I;
     type ValueType = V;
 
-    fn from_stream_iterator<Iter: StreamIterator<I=I, V=V>>(iter: Iter) -> Self {
+    fn from_stream_iterator<Iter: IndexedIterator<I=I, V=V>>(iter: Iter) -> Self {
         let mut result = Vec::new();
         result.extend_from_stream_iterator(iter);
         result
     }
 
-    fn extend_from_stream_iterator<Iter: StreamIterator<I=I, V=V>>(&mut self, iter: Iter) {
+    fn extend_from_stream_iterator<Iter: IndexedIterator<I=I, V=V>>(&mut self, mut iter: Iter) {
         iter.for_each(|i, v| {
             self.push((i, v));
         });
@@ -123,15 +169,15 @@ pub struct MappedStream<S, F, O> {
 }
 
 impl<S, F, O> MappedStream<S, F, O>
-        where S: StreamIterator,
+        where S: IndexedIterator,
         F: Fn(S::I, S::V) -> O {
     pub fn map(stream: S, map: F) -> Self {
         MappedStream { stream, map, _output: PhantomData }
     }
 }
 
-impl<S, F, O> StreamIterator for MappedStream<S, F, O>
-    where S: StreamIterator,
+impl<S, F, O> IndexedIterator for MappedStream<S, F, O>
+    where S: IndexedIterator,
           F: Fn(S::I, S::V) -> O {
     type I = S::I;
     type V = O;
@@ -170,7 +216,7 @@ impl<S> DenseStreamIterator<S> {
 }
 
 impl<S> Iterator for DenseStreamIterator<S>
-    where S: StreamIterator<I = usize>,
+    where S: IndexedIterator<I = usize>,
           S::V: Zero
 {
     type Item = S::V;

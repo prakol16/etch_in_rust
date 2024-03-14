@@ -1,4 +1,4 @@
-use super::stream_defs::{FromStreamIterator, IntoStreamIterator, StreamIterator};
+use super::stream_defs::{FromStreamIterator, IntoStreamIterator, IndexedIterator};
 
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -71,7 +71,7 @@ impl<'a, T> SparseVecGalloper<'a, T> {
 }
 
 
-impl<T: Clone> StreamIterator for SparseVecGalloper<'_, T> {
+impl<T: Clone> IndexedIterator for SparseVecGalloper<'_, T> {
     type I = usize;
     type V = T;
 
@@ -107,7 +107,7 @@ impl<T: Clone> StreamIterator for SparseVecGalloper<'_, T> {
     }
 }
 
-impl<T: Clone> StreamIterator for SparseVecIterator<'_, T> {
+impl<T: Clone> IndexedIterator for SparseVecIterator<'_, T> {
     type I = usize;
     type V = T;
 
@@ -165,7 +165,7 @@ impl<T: std::ops::AddAssign + Default + Clone> FromStreamIterator for SparseVec<
     type IndexType = usize;
     type ValueType = T;
 
-    fn from_stream_iterator<Iter: StreamIterator<I=usize, V=T>>(iter: Iter) -> Self {
+    fn from_stream_iterator<Iter: IndexedIterator<I=usize, V=T>>(iter: Iter) -> Self {
         let mut result = SparseVec {
             inds: Vec::new(),
             vals: Vec::new(),
@@ -174,7 +174,7 @@ impl<T: std::ops::AddAssign + Default + Clone> FromStreamIterator for SparseVec<
         result
     }
 
-    fn extend_from_stream_iterator<Iter: StreamIterator<I=usize, V=T>>(&mut self, iter: Iter) {
+    fn extend_from_stream_iterator<Iter: IndexedIterator<I=usize, V=T>>(&mut self, mut iter: Iter) {
         iter.for_each(|i, v| {
             self.inds.push(i);
             self.vals.push(v);
