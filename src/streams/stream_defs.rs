@@ -22,6 +22,14 @@ pub trait IndexedStream {
     /// (in the lexicographic order with false < true), then progress is made
     fn seek(&mut self, index: &Self::I, strict: bool);
 
+    /// Should be equivalent to seek(index(), ready()).
+    /// Will only be called when `valid` is true.
+    /// Some stream implementations may choose to override this with a more efficient implementation.
+    #[inline]
+    fn next(&mut self) {
+        self.seek(&self.index(), self.ready());
+    }
+
     /// Emit the current index of the stream.
     /// Will only be called when `valid` is true
     fn index(&self) -> Self::I;
@@ -42,13 +50,13 @@ pub trait IndexedStream {
     {
         let mut acc = init;
         while self.valid() {
-            let i = self.index();
             if self.ready() {
+                let i = self.index();
                 let v = self.value();
-                self.seek(&i, true);
+                self.next();
                 acc = f(acc, i, v)?;
             } else {
-                self.seek(&i, false);
+                self.next();
             }
         }
         ControlFlow::Continue(acc)
@@ -202,6 +210,10 @@ impl<S, F, O> IndexedStream for MappedStream<S, F, O>
         self.stream.seek(index, strict);
     }
 
+    fn next(&mut self) {
+        self.stream.next();
+    }
+
     fn index(&self) -> Self::I {
         self.stream.index()
     }
@@ -239,7 +251,7 @@ impl<S> Iterator for DenseStreamIterator<S>
             } else if self.stream.ready() {
                 self.index += 1;
                 let v = self.stream.value();
-                self.stream.seek(&i, true);
+                self.stream.next();
                 Some(v)
             } else {
                 self.stream.seek(&self.index, false);

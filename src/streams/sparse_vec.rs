@@ -128,6 +128,10 @@ impl<T: Clone> IndexedStream for SparseVecIterator<'_, T> {
         }
     }
 
+    fn next(&mut self) {
+        self.cur += 1;
+    }
+
     fn index(&self) -> usize {
         self.inds[self.cur]
     }
