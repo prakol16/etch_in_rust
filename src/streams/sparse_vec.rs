@@ -44,35 +44,35 @@ impl<T> SparseVec<T> {
 }
 
 #[derive(Debug, Clone)]
-pub struct SparseVecGalloper<'a, T> {
-    inds: &'a [usize],
+pub struct SparseVecGalloper<'a, I, T> {
+    inds: &'a [I],
     vals: &'a [T],
     cur: usize
 }
 
 #[derive(Debug, Clone)]
-pub struct SparseVecIterator<'a, T> {
-    inds: &'a [usize],
+pub struct SparseVecIterator<'a, I, T> {
+    inds: &'a [I],
     vals: &'a [T],
     cur: usize
 }
 
-impl<'a, T> SparseVecIterator<'a, T> {
-    pub fn new(inds: &'a [usize], vals: &'a [T]) -> Self {
+impl<'a, I, T> SparseVecIterator<'a, I, T> {
+    pub fn new(inds: &'a [I], vals: &'a [T]) -> Self {
         SparseVecIterator { inds, vals, cur: 0 }
     }
 }
 
-impl<'a, T> SparseVecGalloper<'a, T> {
+impl<'a, I, T> SparseVecGalloper<'a, I, T> {
     #[allow(dead_code)]
-    pub fn new(inds: &'a [usize], vals: &'a [T]) -> Self {
+    pub fn new(inds: &'a [I], vals: &'a [T]) -> Self {
         SparseVecGalloper { inds, vals, cur: 0 }
     }
 }
 
 
-impl<T: Clone> IndexedStream for SparseVecGalloper<'_, T> {
-    type I = usize;
+impl<I: Ord + Clone, T: Clone> IndexedStream for SparseVecGalloper<'_, I, T> {
+    type I = I;
     type V = T;
 
     fn valid(&self) -> bool {
@@ -83,7 +83,7 @@ impl<T: Clone> IndexedStream for SparseVecGalloper<'_, T> {
         true
     }
 
-    fn seek(&mut self, index: &usize, strict: bool) {
+    fn seek(&mut self, index: &I, strict: bool) {
         // Do a binary search to find the first element >= index (or > index if strict)
         let mut left = self.cur;
         let mut right = self.inds.len();
@@ -98,8 +98,8 @@ impl<T: Clone> IndexedStream for SparseVecGalloper<'_, T> {
         self.cur = left;
     }
 
-    fn index(&self) -> usize {
-        self.inds[self.cur]
+    fn index(&self) -> I {
+        self.inds[self.cur].clone()
     }
 
     fn value(&self) -> T {
@@ -107,8 +107,8 @@ impl<T: Clone> IndexedStream for SparseVecGalloper<'_, T> {
     }
 }
 
-impl<T: Clone> IndexedStream for SparseVecIterator<'_, T> {
-    type I = usize;
+impl<I: Ord + Clone, T: Clone> IndexedStream for SparseVecIterator<'_, I, T> {
+    type I = I;
     type V = T;
 
     fn valid(&self) -> bool {
@@ -119,7 +119,7 @@ impl<T: Clone> IndexedStream for SparseVecIterator<'_, T> {
         true
     }
 
-    fn seek(&mut self, index: &usize, strict: bool) {
+    fn seek(&mut self, index: &I, strict: bool) {
         while self.inds[self.cur] < *index || (strict && self.inds[self.cur] == *index) {
             self.cur += 1;
             if self.cur >= self.inds.len() {
@@ -132,8 +132,8 @@ impl<T: Clone> IndexedStream for SparseVecIterator<'_, T> {
         self.cur += 1;
     }
 
-    fn index(&self) -> usize {
-        self.inds[self.cur]
+    fn index(&self) -> I {
+        self.inds[self.cur].clone()
     }
 
     fn value(&self) -> T {
@@ -142,7 +142,7 @@ impl<T: Clone> IndexedStream for SparseVecIterator<'_, T> {
 }
 
 impl<T> SparseVec<T> {
-    pub fn gallop(&self) -> SparseVecGalloper<'_, T> {
+    pub fn gallop(&self) -> SparseVecGalloper<'_, usize, T> {
         SparseVecGalloper {
             inds: &self.inds,
             vals: &self.vals,
@@ -154,7 +154,7 @@ impl<T> SparseVec<T> {
 impl<'a, T: Clone> IntoStreamIterator for &'a SparseVec<T> {
     type IndexType = usize;
     type ValueType = T;
-    type StreamType = SparseVecIterator<'a, T>;
+    type StreamType = SparseVecIterator<'a, usize, T>;
 
     fn into_stream_iterator(self) -> Self::StreamType {
         SparseVecIterator {

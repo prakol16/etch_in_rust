@@ -67,7 +67,7 @@ pub struct SparseCSRMatIterator<'a, T> {
 
 impl<'a, T> IndexedStream for SparseCSRMatIterator<'a, T> {
     type I = usize;
-    type V = SparseVecIterator<'a, T>;
+    type V = SparseVecIterator<'a, usize, T>;
 
     fn valid(&self) -> bool {
         self.cur < self.rows.len() - 1
@@ -98,7 +98,7 @@ impl<'a, T> IndexedStream for SparseCSRMatIterator<'a, T> {
 
 impl<'a, T> IntoStreamIterator for &'a SparseCSRMat<T> {
     type IndexType = usize;
-    type ValueType = SparseVecIterator<'a, T>;
+    type ValueType = SparseVecIterator<'a, usize, T>;
     type StreamType = SparseCSRMatIterator<'a, T>;
 
     fn into_stream_iterator(self) -> Self::StreamType {
