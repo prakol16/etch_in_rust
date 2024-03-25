@@ -10,6 +10,7 @@ num-traits = "0.2.17"
 
 [dev-dependencies]
 criterion = { version = "0.4", features = ["html_reports"] }
+rand = "0.8.5"
 
 [[bench]]
 name = "bench_main"

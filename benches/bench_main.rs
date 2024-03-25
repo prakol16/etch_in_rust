@@ -1,40 +1,32 @@
+use std::time::Duration;
+
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use etch::streams::{sorted_vec::SortedVecGalloper, stream_defs::IndexedStream};
+use etch::examples::triangle_query::triangle_query;
+use rand::prelude::SliceRandom;
 
-/// Perform the triangle query on s1, s2, s3
-/// Assumes s1, s2, s3 are sorted
-fn triangle_query<A: Ord + Clone, B: Ord + Clone, C: Ord + Clone>(s1: &[A], s2: &[B], s3: &[C]) {
-    fn join_1<A: Ord + Clone, B: Ord + Clone, C: Ord + Clone>(
-            x: impl IndexedStream<I = A, V = impl IndexedStream<I = B, V = ()>>,
-            y: impl IndexedStream<I = B, V = impl IndexedStream<I = C, V = ()>> + Clone) -> 
-              impl IndexedStream<I = A, V = impl IndexedStream<I = B, V = impl IndexedStream<I = C, V = ()>>> {
-        x
-        .map(move |_, a| a.zip_with(y.clone(), |_, b| b))
-    }
-
-    fn join_2<A: Ord + Clone, B: Ord + Clone, C: Ord + Clone>(
-        x: impl IndexedStream<I = A, V = impl IndexedStream<I = B, V = impl IndexedStream<I = C, V = ()>>>,
-        y: impl IndexedStream<I = A, V = impl IndexedStream<I = C, V = ()> + Clone>
-    ) -> impl IndexedStream<I = A, V = impl IndexedStream<I = B, V = impl IndexedStream<I = C, V = ()>>> {
-        x
-        .zip_with(y, |a, b| a.map(move |_, c| b.clone().zip_with(c, |_, _| ())))            
-    }
-
-    let t1 = SortedVecGalloper::new(s1)
-        .map(|_, _| SortedVecGalloper::new(s2));
-    let t2 = SortedVecGalloper::new(s2)
-        .map(|_, _| SortedVecGalloper::new(s3));
-    let t3 = SortedVecGalloper::new(s1)
-        .map(|_, _| SortedVecGalloper::new(s3));
-    let result = join_2(join_1(t1, t2), t3);
-    
-    
-
+fn gen_random_sorted_strings(n: usize) -> Vec<String> {
+    let mut rng = rand::thread_rng();
+    let mut numbers: Vec<u32> = (1..=2*n as u32).collect();
+    numbers.shuffle(&mut rng);
+    numbers.truncate(n);
+    let mut strings: Vec<String> = numbers.iter().map(|&num| num.to_string()).collect();
+    strings.sort_unstable();
+    strings
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
-    c.bench_function("tri.fused abc", |b| b.iter(|| 
-        triangle_query(&["a"], &["b"], &["c"])));
+    let n = 100;
+    let s1 = gen_random_sorted_strings(n);
+    let s2 = gen_random_sorted_strings(n);
+    let s3 = gen_random_sorted_strings(n);
+    let s1_ref = s1.iter().map(|s| s.as_str()).collect::<Vec<&str>>();
+    let s2_ref = s2.iter().map(|s| s.as_str()).collect::<Vec<&str>>();
+    let s3_ref = s3.iter().map(|s| s.as_str()).collect::<Vec<&str>>();
+
+    let mut group = c.benchmark_group("tri");
+    group.measurement_time(Duration::from_secs(10));
+    group.bench_function("tri.fused", |b| 
+        b.iter(|| black_box(triangle_query(&s1_ref, &s2_ref, &s3_ref))));
 }
 
 criterion_group!(benches, criterion_benchmark);

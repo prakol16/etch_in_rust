@@ -114,7 +114,7 @@ impl<'a, T> IntoStreamIterator for &'a SparseCSRMat<T> {
 impl<'a, T> FromStreamIterator for SparseCSRMatIterator<'a, T>
 {
     type IndexType = usize;
-    type ValueType = SparseVec<T>;
+    type ValueType = SparseVec<usize, T>;
 
     fn from_stream_iterator<I: IndexedStream<I=Self::IndexType, V=Self::ValueType>>(_iter: I) -> Self {
         todo!()

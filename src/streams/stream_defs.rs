@@ -124,6 +124,13 @@ pub trait IndexedStream {
     {
         ZipStream::new(self, right, f)
     }
+
+    fn collect<O: FromStreamIterator<IndexType = Self::I, ValueType = Self::V>>(self) -> O
+    where
+        Self: Sized
+    {
+        O::from_stream_iterator(self)
+    }
 }
 
 pub trait IntoStreamIterator {
@@ -263,3 +270,11 @@ impl<S> Iterator for DenseStreamIterator<S>
         }
     }    
 }
+
+// TODO: turn into a proper trait/method
+pub fn collect_indices<S: IndexedStream>(s: S) -> Vec<S::I> {
+    let mut indices = Vec::new();
+    s.for_each(|i, _| indices.push(i));
+    indices
+}
+
