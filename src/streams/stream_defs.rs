@@ -178,6 +178,7 @@ impl<I, V> FromStreamIterator for Vec<(I, V)> {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct MappedStream<S, F, O> {
     stream: S,
     map: F,

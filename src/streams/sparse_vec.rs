@@ -1,6 +1,16 @@
 use super::stream_defs::{FromStreamIterator, IntoStreamIterator, IndexedStream};
 
 
+/// Helper function to compare with a strict parameter
+#[inline]
+pub(crate) fn lt_or_possibly_eq<I: Ord>(x: &I, y: &I, allow_eq: bool) -> bool {
+    match x.cmp(y) {
+        std::cmp::Ordering::Less => true,
+        std::cmp::Ordering::Equal => allow_eq,
+        std::cmp::Ordering::Greater => false,
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SparseVec<T> {
     /// The data in the sparse vector
@@ -89,7 +99,7 @@ impl<I: Ord + Clone, T: Clone> IndexedStream for SparseVecGalloper<'_, I, T> {
         let mut right = self.inds.len();
         while left < right {
             let mid = left + (right - left) / 2;
-            if self.inds[mid] < *index || (strict && self.inds[mid] == *index) {
+            if lt_or_possibly_eq(&self.inds[mid], index, strict){
                 left = mid + 1;
             } else {
                 right = mid;
