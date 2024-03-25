@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use etch::examples::triangle_query::triangle_query;
+use etch::examples::triangle_query::{all_combinations, triangle_query_fused};
 use rand::prelude::SliceRandom;
 
 fn gen_random_sorted_strings(n: usize) -> Vec<String> {
@@ -26,7 +26,9 @@ fn criterion_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("tri");
     group.measurement_time(Duration::from_secs(10));
     group.bench_function("tri.fused", |b| 
-        b.iter(|| black_box(triangle_query(&s1_ref, &s2_ref, &s3_ref))));
+        b.iter(|| black_box(triangle_query_fused(&s1_ref, &s2_ref, &s3_ref))));
+    group.bench_function("tri.optimal", |b|
+        b.iter(|| black_box(all_combinations(&s1_ref, &s2_ref, &s3_ref))));
 }
 
 criterion_group!(benches, criterion_benchmark);
