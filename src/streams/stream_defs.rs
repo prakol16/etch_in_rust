@@ -229,6 +229,11 @@ impl<S, F, O> IndexedStream for MappedStream<S, F, O>
     fn value(&self) -> Self::V {
         (self.map)(self.stream.index(), self.stream.value())
     }
+
+    fn try_fold<B, FF, R>(&mut self, init: B, mut f: FF) -> ControlFlow<R, B> where
+            FF: FnMut(B, Self::I, Self::V) -> ControlFlow<R, B> {
+        self.stream.try_fold(init, |acc, i, v| f(acc, i, (self.map)(i, v)))
+    }
 }
 
 /// A stream iterator that produces a dense stream of values at every index
