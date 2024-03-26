@@ -1,15 +1,4 @@
-use super::stream_defs::{FromStreamIterator, IntoStreamIterator, IndexedStream};
-
-
-/// Helper function to compare with a strict parameter
-#[inline]
-pub(crate) fn lt_or_possibly_eq<I: Ord>(x: &I, y: &I, allow_eq: bool) -> bool {
-    match x.cmp(y) {
-        std::cmp::Ordering::Less => true,
-        std::cmp::Ordering::Equal => allow_eq,
-        std::cmp::Ordering::Greater => false,
-    }
-}
+use super::{binary_search::binary_search, stream_defs::{FromStreamIterator, IndexedStream, IntoStreamIterator}};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SparseVec<I, T> {
@@ -100,18 +89,11 @@ impl<I: Ord + Clone, T: Clone> IndexedStream for SparseVecGalloper<'_, I, T> {
     }
 
     fn seek(&mut self, index: &I, strict: bool) {
-        // Do a binary search to find the first element >= index (or > index if strict)
-        let mut left = self.cur;
-        let mut right = self.inds.len();
-        while left < right {
-            let mid = left + (right - left) / 2;
-            if lt_or_possibly_eq(&self.inds[mid], index, strict){
-                left = mid + 1;
-            } else {
-                right = mid;
-            }
-        }
-        self.cur = left;
+        self.cur += binary_search(&self.inds[self.cur..], index, strict);
+    }
+
+    fn next(&mut self) {
+        self.cur += 1;
     }
 
     fn index(&self) -> I {
@@ -158,8 +140,16 @@ impl<I: Ord + Clone, T: Clone> IndexedStream for SparseVecIterator<'_, I, T> {
 }
 
 impl<I, T> SparseVec<I, T> {
-    pub fn gallop(&self) -> SparseVecGalloper<'_, I, T> {
+    pub fn stream_iter(&self) -> SparseVecGalloper<'_, I, T> {
         SparseVecGalloper {
+            inds: &self.inds,
+            vals: &self.vals,
+            cur: 0
+        }
+    }
+
+    pub fn stream_iter_linear(&self) -> SparseVecIterator<'_, I, T> {
+        SparseVecIterator {
             inds: &self.inds,
             vals: &self.vals,
             cur: 0
@@ -170,14 +160,10 @@ impl<I, T> SparseVec<I, T> {
 impl<'a, I: Ord + Clone, T: Clone> IntoStreamIterator for &'a SparseVec<I, T> {
     type IndexType = I;
     type ValueType = T;
-    type StreamType = SparseVecIterator<'a, I, T>;
+    type StreamType = SparseVecGalloper<'a, I, T>;
 
     fn into_stream_iterator(self) -> Self::StreamType {
-        SparseVecIterator {
-            inds: &self.inds,
-            vals: &self.vals,
-            cur: 0
-        }
+        self.stream_iter()
     }
 }
 

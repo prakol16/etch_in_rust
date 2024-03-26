@@ -20,7 +20,7 @@ mod test {
     fn test_gallop() {
         let v1 = SparseVec::from_iter([(1, 4), (20, 2), (33, 3)]);
         let v2 = SparseVec::from_iter([(1, 7), (2, -3), (5, 10), (33, 9)]);
-        let prod = v1.into_stream_iterator().zip_with(v2.gallop(), mul);
+        let prod = v1.stream_iter_linear().zip_with(v2.stream_iter(), mul);
         let mut result = Vec::with_capacity(v1.len().min(v2.len()));
         result.extend_from_stream_iterator(prod);
         assert_eq!(result, vec![(1, 28), (33, 27)]);
@@ -31,7 +31,7 @@ mod test {
         let v1 = SparseVec::from_iter([(1, 4), (20, 2), (33, 3)]);
         let v2 = SparseVec::from_iter([(1, 7), (2, -3), (5, 10), (33, 9)]);
         let v3 = SparseVec::from_iter([(1, -2), (2, 3), (5, 7), (29, 4)]);
-        let prod2 = v1.into_stream_iterator().zip_with(v2.into_stream_iterator(), mul).zip_with(v3.into_stream_iterator(), mul);
+        let prod2 = v1.stream_iter_linear().zip_with(v2.stream_iter_linear(), mul).zip_with(v3.stream_iter_linear(), mul);
         let mut result2 = Vec::with_capacity(v1.len().min(v2.len()).min(v3.len()));
         result2.extend_from_stream_iterator(prod2);
         assert_eq!(result2, vec![(1, -56)]);
@@ -41,7 +41,7 @@ mod test {
     fn test_sparse_vec_from_iter() {
         let v1 = SparseVec::from_iter([(1, 4), (20, 2), (33, 3)]);
         let v4 = SparseVec::from_iter([(3, -2), (10, 5), (20, 5), (33, 7)]);
-        let prod3 = v4.into_stream_iterator().zip_with(v1.into_stream_iterator(), mul);
+        let prod3 = v4.stream_iter().zip_with(v1.stream_iter(), mul);
         let mut result3 = SparseVec::with_capacity(v4.len().min(v1.len()));
         result3.extend_from_stream_iterator(prod3);
         assert_eq!(result3, SparseVec::from_iter([(20, 10), (33, 21)]));
@@ -50,7 +50,7 @@ mod test {
     #[test]
     fn test_contract() {
         let v1 = SparseVec::from_iter([(1, 4), (20, 2), (33, 3)]);
-        let result4: i32 = v1.into_stream_iterator().contract();
+        let result4: i32 = v1.stream_iter_linear().contract();
         assert_eq!(result4, 9);
     }
 
@@ -59,7 +59,7 @@ mod test {
         let v3 = SparseVec::from_iter([(1, -2), (2, 3), (5, 7), (29, 4)]);
         let mat1 = SparseCSRMat::from_iter([(0, 0, 1), (0, 1, 2), (1, 5, 3), (1, 29, 4)]);
         let prod4 = mat1.into_stream_iterator()
-            .map(|_, v| v.zip_with(v3.into_stream_iterator(), mul));
+            .map(|_, v| v.zip_with(v3.stream_iter(), mul));
         let sum2 = prod4.map(|_i, v| v.contract());
         let result5: Vec<i32> = DenseStreamIterator::from_stream_iterator(sum2).into_iter().collect();
         assert_eq!(result5, vec![-4, 37]);
@@ -76,4 +76,10 @@ mod test {
         intersection.for_each(|i, _| result.push(i));
         assert_eq!(result, vec![1, 2, 10, 33]);
     }
+
+    // fn nested_sparse_vec() {
+    //     let nested_vec = SparseVec::from_iter(
+    //         [(1, SparseVec::from_iter([(1, 2), (2, 3)]))]
+    //     );
+    // }
 }
