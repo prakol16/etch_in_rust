@@ -76,9 +76,9 @@ impl<'a, I, T> SparseVecGalloper<'a, I, T> {
 }
 
 
-impl<I: Ord + Copy, T: Clone> IndexedStream for SparseVecGalloper<'_, I, T> {
+impl<'a, I: Ord + Copy, T> IndexedStream for SparseVecGalloper<'a, I, T> {
     type I = I;
-    type V = T;
+    type V = &'a T;
 
     fn valid(&self) -> bool {
         self.cur < self.inds.len()
@@ -100,14 +100,14 @@ impl<I: Ord + Copy, T: Clone> IndexedStream for SparseVecGalloper<'_, I, T> {
         self.inds[self.cur]
     }
 
-    fn value(&self) -> T {
-        self.vals[self.cur].clone()
+    fn value(&self) -> &'a T {
+        &self.vals[self.cur]
     }
 }
 
-impl<I: Ord + Copy, T: Clone> IndexedStream for SparseVecIterator<'_, I, T> {
+impl<'a, I: Ord + Copy, T> IndexedStream for SparseVecIterator<'a, I, T> {
     type I = I;
-    type V = T;
+    type V = &'a T;
 
     fn valid(&self) -> bool {
         self.cur < self.inds.len()
@@ -131,11 +131,11 @@ impl<I: Ord + Copy, T: Clone> IndexedStream for SparseVecIterator<'_, I, T> {
     }
 
     fn index(&self) -> I {
-        self.inds[self.cur].clone()
+        self.inds[self.cur]
     }
 
-    fn value(&self) -> T {
-        self.vals[self.cur].clone()
+    fn value(&self) -> &'a T {
+        &self.vals[self.cur]
     }
 }
 
@@ -157,9 +157,9 @@ impl<I, T> SparseVec<I, T> {
     }
 }
 
-impl<'a, I: Ord + Copy, T: Clone> IntoStreamIterator for &'a SparseVec<I, T> {
+impl<'a, I: Ord + Copy, T> IntoStreamIterator for &'a SparseVec<I, T> {
     type IndexType = I;
-    type ValueType = T;
+    type ValueType = &'a T;
     type StreamType = SparseVecGalloper<'a, I, T>;
 
     fn into_stream_iterator(self) -> Self::StreamType {
