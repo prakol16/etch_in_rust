@@ -278,3 +278,6 @@ pub fn collect_indices<S: IndexedStream>(s: S) -> Vec<S::I> {
     indices
 }
 
+pub trait CloneableIndexedStream: IndexedStream + Clone {}
+
+impl<S> CloneableIndexedStream for S where S: IndexedStream + Clone {}

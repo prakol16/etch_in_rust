@@ -4,4 +4,4 @@ pub mod add_stream;
 pub mod sparse_vec;
 pub mod sorted_vec;
 pub mod csr_mat;
-
+pub mod macros;

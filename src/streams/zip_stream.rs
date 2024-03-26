@@ -1,6 +1,7 @@
 use super::stream_defs::{IntoStreamIterator, IndexedStream};
 
 
+#[derive(Debug, Clone)]
 pub struct ZipStream<L, R, F> {
     left: L,
     right: R,

@@ -43,7 +43,6 @@ impl<I, T> SparseVec<I, T> {
     }
 
     /// Creates an empty `SparseVec`.
-    #[allow(dead_code)]
     pub fn empty() -> Self {
         SparseVec {
             inds: Vec::new(),
