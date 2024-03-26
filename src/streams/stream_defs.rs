@@ -118,6 +118,14 @@ pub trait IndexedStream {
         MappedStream::map(self, map)
     }
 
+    fn cloned<'a, V>(self) -> ClonedStream<Self>
+    where
+        Self: Sized + IndexedStream<V = &'a V>,
+        V: Clone + 'a
+    {
+        ClonedStream::new(self)
+    }
+
     fn zip_with<R: IndexedStream<I = Self::I>, O, F: Fn(Self::V, R::V) -> O>(self, right: R, f: F) -> ZipStream<Self, R, F>
     where
         Self: Sized
@@ -233,6 +241,63 @@ impl<S, F, O> IndexedStream for MappedStream<S, F, O>
     fn try_fold<B, FF, R>(&mut self, init: B, mut f: FF) -> ControlFlow<R, B> where
             FF: FnMut(B, Self::I, Self::V) -> ControlFlow<R, B> {
         self.stream.try_fold(init, |acc, i, v| f(acc, i, (self.map)(i, v)))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ClonedStream<S> 
+where
+    S: IndexedStream
+{
+    stream: S,
+}
+
+impl<S> ClonedStream<S>
+where
+    S: IndexedStream
+{
+    pub fn new(stream: S) -> Self {
+        ClonedStream { stream }
+    }
+}
+
+impl<'a, V, S> IndexedStream for ClonedStream<S>
+where
+    S: IndexedStream<V = &'a V>,
+    V: Clone + 'a,
+{
+    type I = S::I;
+    type V = V;
+
+    fn valid(&self) -> bool {
+        self.stream.valid()
+    }
+
+    fn ready(&self) -> bool {
+        self.stream.ready()
+    }
+
+    fn seek(&mut self, index: Self::I, strict: bool) {
+        self.stream.seek(index, strict);
+    }
+
+    fn next(&mut self) {
+        self.stream.next();
+    }
+
+    fn index(&self) -> Self::I {
+        self.stream.index()
+    }
+
+    fn value(&self) -> Self::V {
+        self.stream.value().clone()
+    }
+
+    fn try_fold<B, F, R>(&mut self, init: B, mut f: F) -> ControlFlow<R, B>
+    where
+        F: FnMut(B, Self::I, Self::V) -> ControlFlow<R, B>
+    {
+        self.stream.try_fold(init, |acc, i, v| f(acc, i, v.clone()))
     }
 }
 
