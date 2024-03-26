@@ -2,7 +2,7 @@ use crate::{cloneable_indexed_stream, streams::{
     sorted_vec::SortedVecGalloper, sparse_vec::SparseVec, stream_defs::{collect_indices, IndexedStream}
 }};
 
-fn join_1<A: Ord + Clone, B: Ord + Clone, C: Ord + Clone>(
+fn join_1<A: Ord + Copy, B: Ord + Copy, C: Ord + Copy>(
     x: cloneable_indexed_stream!(A, B, ()),
     y: cloneable_indexed_stream!(B, C, ()),
 ) -> cloneable_indexed_stream!(A, B, C, ())
@@ -10,7 +10,7 @@ fn join_1<A: Ord + Clone, B: Ord + Clone, C: Ord + Clone>(
     x.map(move |_, a| a.zip_with(y.clone(), |_, b| b))
 }
 
-fn join_2<A: Ord + Clone, B: Ord + Clone, C: Ord + Clone>(
+fn join_2<A: Ord + Copy, B: Ord + Copy, C: Ord + Copy>(
     x: cloneable_indexed_stream!(A, B, C, ()),
     y: cloneable_indexed_stream!(A, C, ()),
 ) -> cloneable_indexed_stream!(A, B, C, ())
@@ -20,7 +20,7 @@ fn join_2<A: Ord + Clone, B: Ord + Clone, C: Ord + Clone>(
     })
 }
 
-pub fn create_all_pairs_table<'a, A: Ord + Clone, B: Ord + Clone>(
+pub fn create_all_pairs_table<'a, A: Ord + Copy, B: Ord + Copy>(
     s1: &'a [A],
     s2: &'a [B],
 ) -> impl IndexedStream<I = A, V = impl IndexedStream<I = B, V = ()> + 'a + Clone> + Clone {
@@ -31,7 +31,7 @@ pub fn create_all_pairs_table<'a, A: Ord + Clone, B: Ord + Clone>(
 /// Perform the triangle query on s1, s2, s3
 /// Assumes s1, s2, s3 are sorted
 /// This version is unfused
-pub fn triangle_query_unfused<A: Ord + Clone, B: Ord + Clone, C: Ord + Clone>(
+pub fn triangle_query_unfused<A: Ord + Copy, B: Ord + Copy, C: Ord + Copy>(
     t1: impl IndexedStream<I = A, V = impl IndexedStream<I = B, V = ()>>,
     t2: impl IndexedStream<I = B, V = impl IndexedStream<I = C, V = ()>> + Clone,
     t3: impl IndexedStream<I = A, V = impl IndexedStream<I = C, V = ()> + Clone>
@@ -58,7 +58,7 @@ pub fn triangle_query_unfused<A: Ord + Clone, B: Ord + Clone, C: Ord + Clone>(
 
 /// Perform the triangle query on s1, s2, s3
 /// Assumes s1, s2, s3 are sorted
-pub fn triangle_query_fused<A: Ord + Clone, B: Ord + Clone, C: Ord + Clone>(
+pub fn triangle_query_fused<A: Ord + Copy, B: Ord + Copy, C: Ord + Copy>(
     t1: cloneable_indexed_stream!(A, B, ()),
     t2: cloneable_indexed_stream!(B, C, ()),
     t3: cloneable_indexed_stream!(A, C, ())
@@ -73,7 +73,7 @@ pub fn triangle_query_fused<A: Ord + Clone, B: Ord + Clone, C: Ord + Clone>(
         .collect()
 }
 
-pub fn all_combinations<A: Ord + Clone, B: Ord + Clone, C: Ord + Clone>(
+pub fn all_combinations<A: Ord + Copy, B: Ord + Copy, C: Ord + Copy>(
     s1: &[A],
     s2: &[B],
     s3: &[C],

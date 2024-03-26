@@ -25,7 +25,7 @@ impl<L, R, F> ZipStream<L, R, F> {
 impl<I, L, R, F, O> IndexedStream for ZipStream<L, R, F> 
     where L: IndexedStream<I=I>,
           R: IndexedStream<I=I>,
-          I: Ord,
+          I: Ord + Copy,
           F: Fn(L::V, R::V) -> O {
     type I = I;
     type V = O;
@@ -38,7 +38,7 @@ impl<I, L, R, F, O> IndexedStream for ZipStream<L, R, F>
         self.left.ready() && self.right.ready() && self.left.index() == self.right.index()
     }
 
-    fn seek(&mut self, index: &I, strict: bool) {
+    fn seek(&mut self, index: I, strict: bool) {
         self.left.seek(index, strict);
         self.right.seek(index, strict);
     }

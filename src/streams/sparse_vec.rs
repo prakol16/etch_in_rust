@@ -76,7 +76,7 @@ impl<'a, I, T> SparseVecGalloper<'a, I, T> {
 }
 
 
-impl<I: Ord + Clone, T: Clone> IndexedStream for SparseVecGalloper<'_, I, T> {
+impl<I: Ord + Copy, T: Clone> IndexedStream for SparseVecGalloper<'_, I, T> {
     type I = I;
     type V = T;
 
@@ -88,8 +88,8 @@ impl<I: Ord + Clone, T: Clone> IndexedStream for SparseVecGalloper<'_, I, T> {
         true
     }
 
-    fn seek(&mut self, index: &I, strict: bool) {
-        self.cur += binary_search(&self.inds[self.cur..], index, strict);
+    fn seek(&mut self, index: I, strict: bool) {
+        self.cur += binary_search(&self.inds[self.cur..], &index, strict);
     }
 
     fn next(&mut self) {
@@ -97,7 +97,7 @@ impl<I: Ord + Clone, T: Clone> IndexedStream for SparseVecGalloper<'_, I, T> {
     }
 
     fn index(&self) -> I {
-        self.inds[self.cur].clone()
+        self.inds[self.cur]
     }
 
     fn value(&self) -> T {
@@ -105,7 +105,7 @@ impl<I: Ord + Clone, T: Clone> IndexedStream for SparseVecGalloper<'_, I, T> {
     }
 }
 
-impl<I: Ord + Clone, T: Clone> IndexedStream for SparseVecIterator<'_, I, T> {
+impl<I: Ord + Copy, T: Clone> IndexedStream for SparseVecIterator<'_, I, T> {
     type I = I;
     type V = T;
 
@@ -117,8 +117,8 @@ impl<I: Ord + Clone, T: Clone> IndexedStream for SparseVecIterator<'_, I, T> {
         true
     }
 
-    fn seek(&mut self, index: &I, strict: bool) {
-        while self.inds[self.cur] < *index || (strict && self.inds[self.cur] == *index) {
+    fn seek(&mut self, index: I, strict: bool) {
+        while self.inds[self.cur] < index || (strict && self.inds[self.cur] == index) {
             self.cur += 1;
             if self.cur >= self.inds.len() {
                 break;
@@ -157,7 +157,7 @@ impl<I, T> SparseVec<I, T> {
     }
 }
 
-impl<'a, I: Ord + Clone, T: Clone> IntoStreamIterator for &'a SparseVec<I, T> {
+impl<'a, I: Ord + Copy, T: Clone> IntoStreamIterator for &'a SparseVec<I, T> {
     type IndexType = I;
     type ValueType = T;
     type StreamType = SparseVecGalloper<'a, I, T>;

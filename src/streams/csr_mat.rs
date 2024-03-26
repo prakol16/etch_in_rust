@@ -77,11 +77,11 @@ impl<'a, T> IndexedStream for SparseCSRMatIterator<'a, T> {
         true
     }
 
-    fn seek(&mut self, index: &Self::I, strict: bool) {
-        self.cur = if strict && *index == self.cur {
-            *index + 1
+    fn seek(&mut self, index: Self::I, strict: bool) {
+        self.cur = if strict && index == self.cur {
+            index + 1
         } else {
-            std::cmp::min(std::cmp::max(self.cur, *index), self.rows.len() - 1)
+            std::cmp::min(std::cmp::max(self.cur, index), self.rows.len() - 1)
         }
     }
 

@@ -24,7 +24,7 @@ impl<L, R> AddStream<L, R> {
 impl<I, L, R> IndexedStream for AddStream<L, R> 
     where L: IndexedStream<I=I>,
           R: IndexedStream<I=I>,
-          I: Ord,
+          I: Ord + Copy,
           L::V: Add<R::V>, {
     type I = I;
     type V = <L::V as Add<R::V>>::Output;
@@ -47,7 +47,7 @@ impl<I, L, R> IndexedStream for AddStream<L, R>
         }
     }
 
-    fn seek(&mut self, index: &I, strict: bool) {
+    fn seek(&mut self, index: I, strict: bool) {
         self.left.seek(index, strict);
         self.right.seek(index, strict);
     }

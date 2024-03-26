@@ -12,7 +12,7 @@ impl<'a, T> SortedVecGalloper<'a, T> {
     }
 }
 
-impl<T: Ord + Clone> IndexedStream for SortedVecGalloper<'_, T> {
+impl<T: Ord + Copy> IndexedStream for SortedVecGalloper<'_, T> {
     type I = T;
     type V = ();
 
@@ -24,8 +24,8 @@ impl<T: Ord + Clone> IndexedStream for SortedVecGalloper<'_, T> {
         true
     }
 
-    fn seek(&mut self, index: &T, strict: bool) {
-        self.cur += binary_search(&self.inds[self.cur..], index, strict);
+    fn seek(&mut self, index: T, strict: bool) {
+        self.cur += binary_search(&self.inds[self.cur..], &index, strict);
     }
 
     fn index(&self) -> T {

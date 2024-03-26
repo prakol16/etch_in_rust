@@ -5,7 +5,7 @@ use num_traits::Zero;
 use super::zip_stream::ZipStream;
 
 pub trait IndexedStream {
-    type I;
+    type I: Copy;
     type V;
 
     /// Determines if the stream has been exhausted.
@@ -20,14 +20,14 @@ pub trait IndexedStream {
     /// Will only be called when `valid` is true
     /// RULE (for termination): whenever (index, strict) >= (self.index(), self.ready()),
     /// (in the lexicographic order with false < true), then progress is made
-    fn seek(&mut self, index: &Self::I, strict: bool);
+    fn seek(&mut self, index: Self::I, strict: bool);
 
     /// Should be equivalent to seek(index(), ready()).
     /// Will only be called when `valid` is true.
     /// Some stream implementations may choose to override this with a more efficient implementation.
     #[inline]
     fn next(&mut self) {
-        self.seek(&self.index(), self.ready());
+        self.seek(self.index(), self.ready());
     }
 
     /// Emit the current index of the stream.
@@ -214,7 +214,7 @@ impl<S, F, O> IndexedStream for MappedStream<S, F, O>
         self.stream.ready()
     }
 
-    fn seek(&mut self, index: &Self::I, strict: bool) {
+    fn seek(&mut self, index: Self::I, strict: bool) {
         self.stream.seek(index, strict);
     }
 
@@ -262,7 +262,7 @@ impl<S> Iterator for DenseStreamIterator<S>
                 self.stream.next();
                 Some(v)
             } else {
-                self.stream.seek(&self.index, false);
+                self.stream.seek(self.index, false);
                 None
             }
         } else {
