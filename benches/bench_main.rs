@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use etch::examples::triangle_query::{all_combinations, create_all_pairs_table, triangle_query_fused};
+use etch::examples::triangle_query::{all_combinations, create_all_pairs_table, triangle_query_fused, triangle_query_unfused};
 use rand::prelude::SliceRandom;
 
 fn gen_random_sorted_strings(n: usize) -> Vec<String> {
@@ -31,6 +31,13 @@ fn criterion_benchmark(c: &mut Criterion) {
             create_all_pairs_table(&s2_ref, &s3_ref),
             create_all_pairs_table(&s1_ref, &s3_ref)
         ))));
+    group.bench_function("tri.unfused", |b| {
+        b.iter(|| black_box(triangle_query_unfused(
+            create_all_pairs_table(&s1_ref, &s2_ref), 
+            create_all_pairs_table(&s2_ref, &s3_ref),
+            create_all_pairs_table(&s1_ref, &s3_ref)
+        )));
+    });
     group.bench_function("tri.optimal", |b|
         b.iter(|| black_box(all_combinations(&s1_ref, &s2_ref, &s3_ref))));
 }

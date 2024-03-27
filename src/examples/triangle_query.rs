@@ -27,24 +27,23 @@ pub fn create_all_pairs_table<'a, A: Ord + Copy, B: Ord + Copy>(
     SortedVecGalloper::new(s1).map(|_, _| SortedVecGalloper::new(s2))
 }
 
-/*
 /// Perform the triangle query on s1, s2, s3
 /// Assumes s1, s2, s3 are sorted
 /// This version is unfused
 pub fn triangle_query_unfused<A: Ord + Copy, B: Ord + Copy, C: Ord + Copy>(
-    t1: impl IndexedStream<I = A, V = impl IndexedStream<I = B, V = ()>>,
-    t2: impl IndexedStream<I = B, V = impl IndexedStream<I = C, V = ()>> + Clone,
-    t3: impl IndexedStream<I = A, V = impl IndexedStream<I = C, V = ()> + Clone>
+    t1: cloneable_indexed_stream!(A, B, ()),
+    t2: cloneable_indexed_stream!(B, C, ()),
+    t3: cloneable_indexed_stream!(A, C, ())
 ) -> SparseVec<A, SparseVec<B, Vec<C>>> {
     let tmp = join_1(t1, t2)
         .map(|_, a| a.map(|_, b| collect_indices(b))
             .collect::<SparseVec<B, Vec<C>>>())
         .collect::<SparseVec<A, SparseVec<B, Vec<C>>>>();
-    let tmp_as_iter = tmp.into_stream_iterator()
+    let tmp_as_iter = tmp.stream_iter()
         .map(|_, x|
-            x.into_stream_iterator().map(|_, y|
-                SortedVecGalloper::new(&y)));
-    let result = join_2(tmp_as_iter,t3);
+            x.stream_iter().map(|_, y|
+                SortedVecGalloper::new(y)));
+    let result = join_2(tmp_as_iter, t3);
 
     result
         .map(|_, a| {
@@ -53,7 +52,6 @@ pub fn triangle_query_unfused<A: Ord + Copy, B: Ord + Copy, C: Ord + Copy>(
         })
         .collect()
 }
-*/
 
 
 /// Perform the triangle query on s1, s2, s3
@@ -101,5 +99,13 @@ fn test_triangle_query() {
     assert_eq!(
         result,
         all_combinations(&s1, &s2, &s3)
+    );
+    assert_eq!(
+        result,
+        triangle_query_unfused(
+            create_all_pairs_table(&s1, &s2),
+            create_all_pairs_table(&s2, &s3),
+            create_all_pairs_table(&s1, &s3),
+        )
     );
 }
