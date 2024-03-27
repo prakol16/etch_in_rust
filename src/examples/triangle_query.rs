@@ -1,19 +1,19 @@
-use crate::{cloneable_indexed_stream, streams::{
+use crate::{indexed_stream, streams::{
     sorted_vec::SortedVecGalloper, sparse_vec::SparseVec, stream_defs::IndexedStream
 }};
 
 fn join_1<A: Ord + Copy, B: Ord + Copy, C: Ord + Copy>(
-    x: cloneable_indexed_stream!(A, B, ()),
-    y: cloneable_indexed_stream!(B, C, ()),
-) -> cloneable_indexed_stream!(A, B, C, ())
+    x: indexed_stream!(A, B, (); Clone),
+    y: indexed_stream!(B, C, (); Clone),
+) -> indexed_stream!(A, B, C, (); Clone)
 {
     x.map(move |_, a| a.zip_with(y.clone(), |_, b| b))
 }
 
 fn join_2<A: Ord + Copy, B: Ord + Copy, C: Ord + Copy>(
-    x: cloneable_indexed_stream!(A, B, C, ()),
-    y: cloneable_indexed_stream!(A, C, ()),
-) -> cloneable_indexed_stream!(A, B, C, ())
+    x: indexed_stream!(A, B, C, (); Clone),
+    y: indexed_stream!(A, C, (); Clone),
+) -> indexed_stream!(A, B, C, (); Clone)
 {
     x.zip_with(y, |a, b| {
         a.map(move |_, c| b.clone().zip_with(c, |_, _| ()))
@@ -23,7 +23,7 @@ fn join_2<A: Ord + Copy, B: Ord + Copy, C: Ord + Copy>(
 pub fn create_all_pairs_table<'a, A: Ord + Copy, B: Ord + Copy>(
     s1: &'a [A],
     s2: &'a [B],
-) -> impl IndexedStream<I = A, V = impl IndexedStream<I = B, V = ()> + 'a + Clone> + Clone {
+) -> indexed_stream!(A, B, (); Clone, 'a){
     SortedVecGalloper::new(s1).map(|_, _| SortedVecGalloper::new(s2))
 }
 
@@ -31,9 +31,9 @@ pub fn create_all_pairs_table<'a, A: Ord + Copy, B: Ord + Copy>(
 /// Assumes s1, s2, s3 are sorted
 /// This version is unfused
 pub fn triangle_query_unfused<A: Ord + Copy, B: Ord + Copy, C: Ord + Copy>(
-    t1: cloneable_indexed_stream!(A, B, ()),
-    t2: cloneable_indexed_stream!(B, C, ()),
-    t3: cloneable_indexed_stream!(A, C, ())
+    t1: indexed_stream!(A, B, (); Clone),
+    t2: indexed_stream!(B, C, (); Clone),
+    t3: indexed_stream!(A, C, (); Clone)
 ) -> SparseVec<A, SparseVec<B, Vec<C>>> {
     let tmp = join_1(t1, t2)
         .map(|_, a| a.map(|_, b| b.collect_indices())
@@ -57,9 +57,9 @@ pub fn triangle_query_unfused<A: Ord + Copy, B: Ord + Copy, C: Ord + Copy>(
 /// Perform the triangle query on s1, s2, s3
 /// Assumes s1, s2, s3 are sorted
 pub fn triangle_query_fused<A: Ord + Copy, B: Ord + Copy, C: Ord + Copy>(
-    t1: cloneable_indexed_stream!(A, B, ()),
-    t2: cloneable_indexed_stream!(B, C, ()),
-    t3: cloneable_indexed_stream!(A, C, ())
+    t1: indexed_stream!(A, B, (); Clone),
+    t2: indexed_stream!(B, C, (); Clone),
+    t3: indexed_stream!(A, C, (); Clone)
 ) -> SparseVec<A, SparseVec<B, Vec<C>>> {
     let result = join_2(join_1(t1, t2), t3);
 
