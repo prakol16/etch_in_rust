@@ -22,13 +22,9 @@ pub fn vec_intersect_manual<I: Ord + Copy>(x: &Vec<I>, y: &Vec<I>) -> Vec<I> {
 /// Given two strictly sorted vectors, compute their intersection
 /// This uses galloping indexed streams
 pub fn vec_intersect_streams_gallop<I: Ord + Copy>(x: &Vec<I>, y: &Vec<I>) -> Vec<I> {
-    let mut result = Vec::new();
      SortedVecGalloper::new(x)
         .zip_with(SortedVecGalloper::new(y), |_, _| ())
-        .for_each(|i, _| {
-            result.push(i);
-        });
-    result
+        .collect_indices()
 }
 
 

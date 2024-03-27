@@ -72,9 +72,7 @@ mod test {
         let v2: Vec<i32> = vec![1, 2, 6, 8, 10, 25, 33];
         let intersection = SortedVecGalloper::new(&v1)
             .zip_with(SortedVecGalloper::new(&v2), |_, _| ());
-        let mut result: Vec<i32> = Vec::with_capacity(std::cmp::min(v1.len(), v2.len()));
-        intersection.for_each(|i, _| result.push(i));
-        assert_eq!(result, vec![1, 2, 10, 33]);
+        assert_eq!(intersection.collect_indices(), vec![1, 2, 10, 33]);
     }
 
     // fn nested_sparse_vec() {

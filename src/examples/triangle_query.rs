@@ -1,5 +1,5 @@
 use crate::{cloneable_indexed_stream, streams::{
-    sorted_vec::SortedVecGalloper, sparse_vec::SparseVec, stream_defs::{collect_indices, IndexedStream}
+    sorted_vec::SortedVecGalloper, sparse_vec::SparseVec, stream_defs::IndexedStream
 }};
 
 fn join_1<A: Ord + Copy, B: Ord + Copy, C: Ord + Copy>(
@@ -36,7 +36,7 @@ pub fn triangle_query_unfused<A: Ord + Copy, B: Ord + Copy, C: Ord + Copy>(
     t3: cloneable_indexed_stream!(A, C, ())
 ) -> SparseVec<A, SparseVec<B, Vec<C>>> {
     let tmp = join_1(t1, t2)
-        .map(|_, a| a.map(|_, b| collect_indices(b))
+        .map(|_, a| a.map(|_, b| b.collect_indices())
             .collect::<SparseVec<B, Vec<C>>>())
         .collect::<SparseVec<A, SparseVec<B, Vec<C>>>>();
     let tmp_as_iter = tmp.stream_iter()
@@ -47,7 +47,7 @@ pub fn triangle_query_unfused<A: Ord + Copy, B: Ord + Copy, C: Ord + Copy>(
 
     result
         .map(|_, a| {
-            a.map(|_, b| collect_indices(b))
+            a.map(|_, b| b.collect_indices())
                 .collect::<SparseVec<B, Vec<C>>>()
         })
         .collect()
@@ -65,7 +65,7 @@ pub fn triangle_query_fused<A: Ord + Copy, B: Ord + Copy, C: Ord + Copy>(
 
     result
         .map(|_, a| {
-            a.map(|_, b| collect_indices(b))
+            a.map(|_, b| b.collect_indices())
                 .collect::<SparseVec<B, Vec<C>>>()
         })
         .collect()

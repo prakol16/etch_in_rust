@@ -97,6 +97,17 @@ pub trait IndexedStream {
         self.fold(Self::V::zero(), |acc, _, v| acc + v)
     }
 
+    /// Collect the indices of this iterator as a Vec
+    /// TODO: turn this into an iterator
+    fn collect_indices(self) -> Vec<Self::I>
+    where
+        Self: Sized
+    {
+        let mut indices = Vec::new();
+        self.for_each(|i, _| indices.push(i));
+        indices
+    }
+
     fn any_nonzero(mut self) -> bool
     where
         Self: Sized,
@@ -341,12 +352,6 @@ impl<S> Iterator for DenseStreamIterator<S>
     }    
 }
 
-// TODO: turn into a proper trait/method
-pub fn collect_indices<S: IndexedStream>(s: S) -> Vec<S::I> {
-    let mut indices = Vec::new();
-    s.for_each(|i, _| indices.push(i));
-    indices
-}
 
 pub trait CloneableIndexedStream: IndexedStream + Clone {}
 
