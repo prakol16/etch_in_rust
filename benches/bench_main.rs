@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use etch::examples::{sorted_vec_intersect::{vec_intersect_manual, vec_intersect_streams_gallop, vec_intersect_streams_linear}, triangle_query::{all_combinations, create_all_pairs_table, triangle_query_fused, triangle_query_unfused}};
+use etch::{examples::{sorted_vec_intersect::{vec_intersect_manual, vec_intersect_streams_gallop, vec_intersect_streams_linear}, triangle_query::{all_combinations, create_all_pairs_table, create_skewed_relation, triangle_query_fused, triangle_query_unfused}}, streams::{sorted_vec::SortedVecGalloper, stream_defs::IndexedStream}};
 use rand::{prelude::SliceRandom, rngs::StdRng, SeedableRng};
 
 fn gen_random_sorted_strings(n: usize, sparsity: usize) -> Vec<String> {
@@ -24,7 +24,7 @@ fn gen_random_sorted_ints(n: usize, sparsity: u32) -> Vec<u32> {
 }
 
 fn triangle_query_benchmark(c: &mut Criterion) {
-    let n = 100;
+    let n = 500;
     let s1 = gen_random_sorted_strings(n, 2);
     let s2 = gen_random_sorted_strings(n, 2);
     let s3 = gen_random_sorted_strings(n, 2);
@@ -32,23 +32,25 @@ fn triangle_query_benchmark(c: &mut Criterion) {
     let s2_ref = s2.iter().map(|s| s.as_str()).collect::<Vec<&str>>();
     let s3_ref = s3.iter().map(|s| s.as_str()).collect::<Vec<&str>>();
 
+    let r1 = create_skewed_relation(&s1_ref, &s2_ref, 10);
+    let r2 = create_skewed_relation(&s2_ref, &s3_ref, 10);
+    let r3 = create_skewed_relation(&s1_ref, &s3_ref, 10);
+
     let mut group = c.benchmark_group("tri");
     group.measurement_time(Duration::from_secs(10));
     group.bench_function("tri.fused", |b| 
         b.iter(|| black_box(triangle_query_fused(
-            create_all_pairs_table(&s1_ref, &s2_ref), 
-            create_all_pairs_table(&s2_ref, &s3_ref),
-            create_all_pairs_table(&s1_ref, &s3_ref)
+            r1.stream_iter().map(|_, x| SortedVecGalloper::new(x)),
+            r2.stream_iter().map(|_, x| SortedVecGalloper::new(x)),
+            r3.stream_iter().map(|_, x| SortedVecGalloper::new(x))
         ))));
     group.bench_function("tri.unfused", |b| {
         b.iter(|| black_box(triangle_query_unfused(
-            create_all_pairs_table(&s1_ref, &s2_ref), 
-            create_all_pairs_table(&s2_ref, &s3_ref),
-            create_all_pairs_table(&s1_ref, &s3_ref)
+            r1.stream_iter().map(|_, x| SortedVecGalloper::new(x)),
+            r2.stream_iter().map(|_, x| SortedVecGalloper::new(x)),
+            r3.stream_iter().map(|_, x| SortedVecGalloper::new(x))
         )));
     });
-    group.bench_function("tri.optimal", |b|
-        b.iter(|| black_box(all_combinations(&s1_ref, &s2_ref, &s3_ref))));
 }
 
 fn sorted_vec_sparse_intersect_benchmark(c: &mut Criterion) {

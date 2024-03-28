@@ -27,6 +27,25 @@ pub fn create_all_pairs_table<'a, A: Ord + Copy, B: Ord + Copy>(
     SortedVecGalloper::new(s1).map(|_, _| SortedVecGalloper::new(s2))
 }
 
+/// Create a relation that maps the first `skew` elements of s1
+/// to all elements of s2 and all other elements to the first `skew` elements of s2
+pub fn create_skewed_relation<A: Ord + Clone, B: Ord + Clone>(
+    s1: &[A],
+    s2: &[B],
+    skew: usize
+) -> SparseVec<A, Vec<B>> {
+    SparseVec {
+        inds: s1.to_vec(),
+        vals: (0..s1.len()).map(|i| {
+            if i < skew {
+                s2.to_vec()
+            } else {
+                s2[..skew].to_vec()
+            }
+        }).collect()
+    }
+}
+
 /// Perform the triangle query on s1, s2, s3
 /// Assumes s1, s2, s3 are sorted
 /// This version is unfused
