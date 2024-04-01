@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use etch::{examples::{sorted_vec_intersect::{vec_intersect_manual, vec_intersect_streams_gallop, vec_intersect_streams_linear}, triangle_query::{all_combinations, create_all_pairs_table, create_skewed_relation, triangle_query_fused, triangle_query_unfused}}, streams::{sorted_vec::SortedVecGalloper, stream_defs::IndexedStream}};
+use etch::{examples::{sorted_vec_intersect::{vec_intersect_manual, vec_intersect_streams_gallop, vec_intersect_streams_linear}, tree_iteration::{intersect2_iterators, intersect2_manual, intersect3_iterators, itersect3_manual}, triangle_query::{create_skewed_relation, triangle_query_fused, triangle_query_unfused}}, streams::{sorted_vec::SortedVecGalloper, stream_defs::IndexedStream}};
 use rand::{prelude::SliceRandom, rngs::StdRng, SeedableRng};
 
 fn gen_random_sorted_strings(n: usize, sparsity: usize) -> Vec<String> {
@@ -85,5 +85,40 @@ fn sorted_vec_dense_intersect_benchmark(c: &mut Criterion) {
     );
 }
 
-criterion_group!(benches, triangle_query_benchmark, sorted_vec_sparse_intersect_benchmark, sorted_vec_dense_intersect_benchmark);
+fn rbtree_intersect_benchmark(c: &mut Criterion) {
+    let tree_a = gen_random_sorted_ints(1_000_000, 10).into_iter().map(|x| (x, ())).collect();
+    let tree_b = gen_random_sorted_ints(1_000_000, 10).into_iter().map(|x| (x, ())).collect();
+    let tree_c = gen_random_sorted_ints(1_000_000, 10).into_iter().map(|x| (x, ())).collect();
+
+    let mut group = c.benchmark_group("rbtree");
+    group.bench_function("rbtree.intersect2_iterators", |b| {
+        b.iter(|| black_box(intersect2_iterators(
+            &tree_a,
+            &tree_b
+        )))
+    });
+    group.bench_function("rbtree.intersect2_manual", |b| {
+        b.iter(|| black_box(intersect2_manual(
+            &tree_a,
+            &tree_b
+        )))
+    });
+    group.bench_function("rbtree.intersect3_iterators", |b| {
+        b.iter(|| black_box(intersect3_iterators(
+            &tree_a,
+            &tree_b,
+            &tree_c
+        )))
+    });
+    group.bench_function("rbtree.intersect3_manual", |b| {
+        b.iter(|| black_box(itersect3_manual(
+            &tree_a,
+            &tree_b,
+            &tree_c
+        )))
+    });
+    group.finish();
+}
+
+criterion_group!(benches, triangle_query_benchmark, sorted_vec_sparse_intersect_benchmark, sorted_vec_dense_intersect_benchmark, rbtree_intersect_benchmark);
 criterion_main!(benches);

@@ -9,7 +9,6 @@ pub struct AddStream<L, R> {
 }
 
 impl<L, R> AddStream<L, R> {
-    #[allow(dead_code)]
     pub fn add(
         left: impl IntoStreamIterator<StreamType = L>,
         right: impl IntoStreamIterator<StreamType = R>

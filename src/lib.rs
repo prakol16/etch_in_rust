@@ -1,4 +1,5 @@
 pub mod streams;
+pub mod rbtree;
 pub mod examples;
 
 #[cfg(test)]
