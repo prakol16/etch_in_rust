@@ -211,7 +211,7 @@ impl<K: Ord, V> NodePtr<K, V> {
                 current = current.right(); // Move right as this node and all its left subtree are not correct
             } else {
                 candidate = current;
-                current = current.left(); // Move left to find a smaller node still greater than `k`.
+                current = current.left(); // Move left to find a smaller node still not satisfying cmp_fn
             }
         }
         candidate

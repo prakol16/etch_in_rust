@@ -59,3 +59,17 @@ fn test_basic_stream() {
     stream.seek(6, false);
     assert!(!stream.valid());
 }
+
+#[test]
+fn test_intersection() {
+    fn make_rbset<I: Ord + Copy>(data: impl IntoIterator<Item = I>) -> RBTree<I, ()> {
+        data.into_iter().map(|x| (x, ())).collect()
+    }
+    let tree_a = make_rbset([1, 2, 3, 4, 5]);
+    let tree_b = make_rbset([3, 4, 5, 6, 7]);
+    let tree_c = make_rbset([5, 6, 7, 8, 9]);
+    assert_eq!(intersect2_iterators(&tree_a, &tree_b), 3);
+    assert_eq!(intersect2_manual(&tree_a, &tree_b), 3);
+    assert_eq!(intersect3_iterators(&tree_a, &tree_b, &tree_c), 1);
+    assert_eq!(itersect3_manual(&tree_a, &tree_b, &tree_c), 1);
+}
