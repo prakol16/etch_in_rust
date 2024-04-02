@@ -6,7 +6,7 @@ use super::stream_defs::{IndexedStream, IntoStreamIterator};
 
 
 /// A stream that chains two streams together, using the second stream when the first stream is exhausted.
-/// Invariant: if the variantis `First`, then the first stream is valid i.e.,
+/// Invariant: if the variant is `First`, then the first stream is valid i.e.,
 /// after calling `next` or `seek` on the first stream, we must check if it is valid.
 pub enum ChainStream<A, B, F> {
     First { stream: A, f: F },
