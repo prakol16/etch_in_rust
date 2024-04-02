@@ -147,3 +147,78 @@ where
     }
 }
 
+
+pub struct FixedChainStream<A, B> {
+    first: A,
+    second: B,
+}
+
+impl<A, B> FixedChainStream<A, B> {
+    pub fn new(first: A, second: B) -> Self {
+        FixedChainStream { first, second }
+    }
+}
+
+impl<A, B> IndexedStream for FixedChainStream<A, B>
+where
+    A: IndexedStream,
+    B: IndexedStream<I = A::I, V = A::V>,
+    A::I: Ord + Copy,
+{
+    type I = A::I;
+    type V = A::V;
+    
+    fn valid(&self) -> bool {
+        self.first.valid() || self.second.valid()
+    }
+    
+    fn ready(&self) -> bool {
+        if self.first.valid() {
+            self.first.ready()
+        } else {
+            self.second.ready()
+        }
+    }
+    
+    fn seek(&mut self, index: Self::I, strict: bool) {
+        if self.first.valid() {
+            let old_index = self.first.index();
+            self.first.seek(index, strict);
+            debug_assert!(self.first.valid() || !self.second.valid() || old_index <= self.second.index());
+        } else {
+            self.second.seek(index, strict);
+        }
+    }
+
+    fn next(&mut self) {
+        if self.first.valid() {
+            let old_index = self.first.index();
+            self.first.next();
+            debug_assert!(self.first.valid() || !self.second.valid() || old_index <= self.second.index());
+        } else {
+            self.second.next();
+        }
+    }
+    
+    fn index(&self) -> Self::I {
+        if self.first.valid() {
+            self.first.index()
+        } else {
+            self.second.index()
+        }
+    }
+    
+    fn value(&self) -> Self::V {
+        if self.first.valid() {
+            self.first.value()
+        } else {
+            self.second.value()
+        }
+    }
+
+    fn try_fold<BB, F, R>(&mut self, init: BB, mut f: F) -> ControlFlow<R, BB> where
+            F: FnMut(BB, Self::I, Self::V) -> ControlFlow<R, BB> {
+        let acc = self.first.try_fold(init, &mut f)?;
+        self.second.try_fold(acc, &mut f)
+    }
+}
