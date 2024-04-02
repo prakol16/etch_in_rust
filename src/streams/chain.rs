@@ -83,9 +83,11 @@ where
         replace_with_or_abort(self, |self_| {
             match self_ {
                 ChainStream::First { stream: mut a, f } => {
+                    let old_index = a.index();
                     a.next();
                     if !a.valid() {
                         let b = f(a);
+                        debug_assert!(!b.valid() || old_index <= b.index());
                         ChainStream::Second { stream: b }
                     } else {
                         ChainStream::First { stream: a, f }
@@ -117,28 +119,28 @@ where
             FF: FnMut(BB, Self::I, Self::V) -> ControlFlow<R, BB> {
         replace_with_or_abort_and_return(self, |self_| {
             match self_ {
-                ChainStream::First { mut stream, f: next } => {
-                    match stream.try_fold(init, &mut f) {
+                ChainStream::First { stream: mut a, f: next } => {
+                    match a.try_fold(init, &mut f) {
                         ControlFlow::Continue(acc) => {
-                            let mut b = next(stream);
+                            let mut b = next(a);
                             let result = b.try_fold(acc, f);
                             (result, ChainStream::Second { stream: b })
                         },
                         ControlFlow::Break(acc) => {
                             // if the first stream returned 'break' on the last iteration
                             // it may be invalid despite acc being 'break' so we must check this case
-                            if stream.valid() {
-                                (ControlFlow::Break(acc), ChainStream::First { stream, f: next })
+                            if a.valid() {
+                                (ControlFlow::Break(acc), ChainStream::First { stream: a, f: next })
                             } else {
-                                let b = next(stream);
+                                let b = next(a);
                                 (ControlFlow::Break(acc), ChainStream::Second { stream: b })
                             }
                         },
                     }
                 },
-                ChainStream::Second { mut stream } => {
-                    let result = stream.try_fold(init, f);
-                    (result, ChainStream::Second { stream })
+                ChainStream::Second { stream:mut b } => {
+                    let result = b.try_fold(init, f);
+                    (result, ChainStream::Second { stream: b })
                 }
             }
         })
