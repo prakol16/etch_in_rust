@@ -2,7 +2,7 @@ use std::{convert::Infallible, marker::PhantomData, ops::{AddAssign, ControlFlow
 
 use num_traits::Zero;
 
-use super::zip_stream::ZipStream;
+use super::{chain::ChainStream, zip_stream::ZipStream};
 
 pub trait IndexedStream {
     type I: Copy;
@@ -150,6 +150,25 @@ pub trait IndexedStream {
     {
         O::from_stream_iterator(self)
     }
+
+    fn and_then_chain<B, F>(self, second: F) -> ChainStream<Self, B, F>
+    where
+        Self: Sized,
+        B: IndexedStream<I = Self::I, V = Self::V>,
+        F: FnOnce(Self) -> B,
+    {
+        ChainStream::chain(self, second)
+    }
+}
+
+
+pub fn chain<A, B>(first: A, second: B) -> 
+    ChainStream<A::StreamType, B::StreamType, impl FnOnce(A::StreamType) -> B::StreamType>
+where
+    A: IntoStreamIterator, 
+    B: IntoStreamIterator<IndexType = A::IndexType, ValueType = A::ValueType>
+{
+    ChainStream::chain(first.into_stream_iterator(), |_| second.into_stream_iterator())
 }
 
 pub trait IntoStreamIterator {
