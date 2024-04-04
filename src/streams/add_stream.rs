@@ -60,12 +60,14 @@ impl<I, L, R> IndexedStream for AddStream<L, R>
     }
 }
 
+#[derive(Debug, Clone)]
 pub enum EitherOrBoth<A, B> {
     Left(A),
     Right(B),
     Both(A, B),
 }
 
+#[derive(Debug, Clone)]
 pub struct IntersectingUnionStream<L, R, F> {
     left: L,
     right: R,
@@ -123,5 +125,20 @@ impl<I, V, L, R, F> IndexedStream for IntersectingUnionStream<L, R, F>
             std::cmp::Ordering::Greater => (self.f)(EitherOrBoth::Right(self.right.value())),
         }
     }
+}
+
+pub fn union<I, V, A, B, F>(x: A, y: B, f: F) -> impl IndexedStream<I = I, V = V>
+where
+    A: IndexedStream<I = I>,
+    B:  IndexedStream<I = I>,
+    F: Fn(EitherOrBoth<A::V, B::V>) -> V,
+    I: Ord + Copy,
+{
+    IntersectingUnionStream::new(x, y, f)
+    .and_then_chain(|stream| {
+        stream.left.map(|_, x| EitherOrBoth::Left(x))
+        .chain(stream.right.map(|_, y| EitherOrBoth::Right(y)))
+        .map(move |_, either| (stream.f)(either))
+    })
 }
 

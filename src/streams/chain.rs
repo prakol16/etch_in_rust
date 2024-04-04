@@ -8,6 +8,7 @@ use super::stream_defs::{IndexedStream, IntoStreamIterator};
 /// A stream that chains two streams together, using the second stream when the first stream is exhausted.
 /// Invariant: if the variant is `First`, then the first stream is valid i.e.,
 /// after calling `next` or `seek` on the first stream, we must check if it is valid.
+#[derive(Clone)]
 pub enum ChainStream<A, B, F> {
     First { stream: A, f: F },
     Second { stream: B },
@@ -147,7 +148,7 @@ where
     }
 }
 
-
+#[derive(Clone)]
 pub struct FixedChainStream<A, B> {
     first: A,
     second: B,
@@ -220,5 +221,70 @@ where
             F: FnMut(BB, Self::I, Self::V) -> ControlFlow<R, BB> {
         let acc = self.first.try_fold(init, &mut f)?;
         self.second.try_fold(acc, &mut f)
+    }
+}
+
+#[cfg(test)]
+
+mod chain_test {
+    use crate::streams::{chain::ChainStream, sorted_vec::SortedVecGalloper, stream_defs::IndexedStream};
+
+    use super::FixedChainStream;
+
+
+    #[test]
+    fn basic_chain_test() {
+        let stream = FixedChainStream::new(
+            SortedVecGalloper::new(&[1, 2, 3, 4, 5]),
+            SortedVecGalloper::new(&[6, 7, 8, 9, 10]),
+        );
+        assert_eq!(stream.clone().collect_indices(), vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    }
+
+    #[test]
+    fn chain_seek_test() {
+        let mut stream = FixedChainStream::new(
+            SortedVecGalloper::new(&[1, 2, 3, 4, 5]),
+            SortedVecGalloper::new(&[6, 7, 8, 9, 10]),
+        );
+        stream.seek(3, false);
+        assert_eq!(stream.index(), 3);
+        stream.seek(3, true);
+        assert_eq!(stream.index(), 4);
+        stream.seek(5, true);
+        assert_eq!(stream.index(), 6);
+        stream.seek(6, false);
+        assert_eq!(stream.index(), 6);
+        stream.seek(4, false);
+        assert_eq!(stream.index(), 6);
+    }
+
+
+    
+    #[test]
+    fn basic_and_then_chain_test() {
+        let stream = ChainStream::chain(
+            SortedVecGalloper::new(&[1, 2, 3, 4, 5]),
+            |_| SortedVecGalloper::new(&[6, 7, 8, 9, 10]),
+        );
+        assert_eq!(stream.clone().collect_indices(), vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    }
+
+    #[test]
+    fn and_then_chain_seek_test() {
+        let mut stream = ChainStream::chain(
+            SortedVecGalloper::new(&[1, 2, 3, 4, 5]),
+            |_| SortedVecGalloper::new(&[6, 7, 8, 9, 10]),
+        );
+        stream.seek(3, false);
+        assert_eq!(stream.index(), 3);
+        stream.seek(3, true);
+        assert_eq!(stream.index(), 4);
+        stream.seek(5, true);
+        assert_eq!(stream.index(), 6);
+        stream.seek(6, false);
+        assert_eq!(stream.index(), 6);
+        stream.seek(4, false);
+        assert_eq!(stream.index(), 6);
     }
 }
