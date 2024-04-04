@@ -7,13 +7,9 @@ pub fn intersect2_iterators<I: Ord + Copy>(a: &RBTree<I, ()>, b: &RBTree<I, ()>)
 }
 
 pub fn intersect2_manual<I: Ord + Copy>(a: &RBTree<I, ()>, b: &RBTree<I, ()>) -> usize {
-    let mut result = 0;
-    for (k, _) in a.iter() {
-        if b.contains_key(&k) {
-            result += 1;
-        }
-    }
-    result
+    a.iter()
+        .filter(|(k, _)| b.contains_key(k))
+        .count()
 }
 
 pub fn intersect3_iterators<I: Ord + Copy>(a: &RBTree<I, ()>, b: &RBTree<I, ()>, c: &RBTree<I, ()>) -> usize {
@@ -24,13 +20,9 @@ pub fn intersect3_iterators<I: Ord + Copy>(a: &RBTree<I, ()>, b: &RBTree<I, ()>,
 }
 
 pub fn itersect3_manual<I: Ord + Copy>(a: &RBTree<I, ()>, b: &RBTree<I, ()>, c: &RBTree<I, ()>) -> usize {
-    let mut result = 0;
-    for (k, _) in a.iter() {
-        if b.contains_key(&k) && c.contains_key(&k) {
-            result += 1;
-        }
-    }
-    result
+    a.iter()
+        .filter(|(k, _)| b.contains_key(k) && c.contains_key(k))
+        .count()
 }
 
 #[test]
