@@ -38,15 +38,12 @@ impl<I, L, R, F, O> IndexedStream for ZipStream<L, R, F>
     fn current(&self) -> StreamResult<Self::I, Self::V> {
         match (self.left.current(), self.right.current()) {
             (StreamResult::Yield { index: li, value: lv }, StreamResult::Yield { index: ri, value: rv }) => {
-                StreamResult::Yield {
-                    index: std::cmp::max(li, ri),
-                    value: (|| {
-                        if li == ri {
-                            Some((self.f)(lv?, rv?))
-                        } else {
-                            None
-                        }
-                    })()
+                if li < ri {
+                    StreamResult::Yield { index: ri, value: None  }
+                } else if ri < li {
+                    StreamResult::Yield { index: li, value: None }
+                } else {
+                    StreamResult::Yield { index: li, value: (|| Some((self.f)(lv?, rv?)))() }
                 }
             }
             _ => StreamResult::Done
