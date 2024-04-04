@@ -1,4 +1,4 @@
-use super::stream_defs::{IntoStreamIterator, IndexedStream};
+use super::stream_defs::{IndexedStream, IntoStreamIterator, StreamResult};
 
 
 #[derive(Debug, Clone)]
@@ -30,24 +30,26 @@ impl<I, L, R, F, O> IndexedStream for ZipStream<L, R, F>
     type I = I;
     type V = O;
 
-    fn valid(&self) -> bool {
-        self.left.valid() && self.right.valid()
-    }
-
-    fn ready(&self) -> bool {
-        self.left.ready() && self.right.ready() && self.left.index() == self.right.index()
-    }
-
     fn seek(&mut self, index: I, strict: bool) {
         self.left.seek(index, strict);
         self.right.seek(index, strict);
     }
 
-    fn index(&self) -> I {
-        self.left.index().max(self.right.index())
-    }
-
-    fn value(&self) -> Self::V {
-        (self.f)(self.left.value(), self.right.value())
+    fn current(&self) -> StreamResult<Self::I, Self::V> {
+        match (self.left.current(), self.right.current()) {
+            (StreamResult::Yield { index: li, value: lv }, StreamResult::Yield { index: ri, value: rv }) => {
+                StreamResult::Yield {
+                    index: std::cmp::max(li, ri),
+                    value: (|| {
+                        if li == ri {
+                            Some((self.f)(lv?, rv?))
+                        } else {
+                            None
+                        }
+                    })()
+                }
+            }
+            _ => StreamResult::Done
+        }
     }
 }

@@ -4,16 +4,31 @@ use num_traits::Zero;
 
 use super::{chain::{ChainStream, FixedChainStream}, zip_stream::ZipStream};
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StreamResult<I, V> {
+    Done,
+    Yield { index: I, value: Option<V> },
+}
+
 pub trait IndexedStream {
     type I: Copy;
     type V;
 
-    /// Determines if the stream has been exhausted.
-    fn valid(&self) -> bool;
+    fn current(&self) -> StreamResult<Self::I, Self::V>;
 
-    /// Determines if the stream should yield an element in its current state.
-    /// Will only be called when `valid` is true
-    fn ready(&self) -> bool;
+    fn valid(&self) -> bool {
+        match self.current() {
+            StreamResult::Done => false,
+            StreamResult::Yield { .. } => true
+        }
+    }
+
+    fn index(&self) -> Option<Self::I> {
+        match self.current() {
+            StreamResult::Done => None,
+            StreamResult::Yield { index, .. } => Some(index)
+        }
+    }
 
     /// Requests the stream to advance as far as possible up to `index`
     /// If `strict` is true, skipping `index` itself is permissible
@@ -22,21 +37,14 @@ pub trait IndexedStream {
     /// (in the lexicographic order with false < true), then progress is made
     fn seek(&mut self, index: Self::I, strict: bool);
 
-    /// Should be equivalent to seek(index(), ready()).
-    /// Will only be called when `valid` is true.
+    /// Like `seek`, but guarantees that current() == Yield(index, value),
+    /// where value.is_some() iff strict is true.
+    /// Should be equivalent to calling seek with those parameters.
     /// Some stream implementations may choose to override this with a more efficient implementation.
     #[inline]
-    fn next(&mut self) {
-        self.seek(self.index(), self.ready());
+    fn next(&mut self, index: Self::I, strict: bool) {
+        self.seek(index, strict);
     }
-
-    /// Emit the current index of the stream.
-    /// Will only be called when `valid` is true
-    fn index(&self) -> Self::I;
-
-    /// Emit the current value of the stream.
-    /// Will only be called when `valid` and `ready` are true
-    fn value(&self) -> Self::V;
 
     /// Get the value of the stream by folding over it.
     /// A default implementation is given.
@@ -49,14 +57,12 @@ pub trait IndexedStream {
         F: FnMut(B, Self::I, Self::V) -> ControlFlow<R, B>
     {
         let mut acc = init;
-        while self.valid() {
-            if self.ready() {
-                let i = self.index();
-                let v = self.value();
-                self.next();
-                acc = f(acc, i, v)?;
+        while let StreamResult::Yield { index, value } = self.current() {
+            if let Some(value) = value {
+                self.next(index, true);
+                acc = f(acc, index, value)?;
             } else {
-                self.next();
+                self.next(index, false);
             }
         }
         ControlFlow::Continue(acc)
@@ -99,7 +105,20 @@ pub trait IndexedStream {
 
     /// Collect the indices of this iterator as a Vec
     /// TODO: turn this into an iterator
-    fn collect_indices(self) -> Vec<Self::I>
+    fn collect_indices<'a, I>(self) -> Vec<I>
+    where
+        Self: Sized + IndexedStream<I = &'a I>,
+        I: 'a + Clone
+    {
+        let mut indices = Vec::new();
+        self.for_each(|i, _| indices.push(i.clone()));
+        indices
+    }
+
+    
+    /// Collect the indices of this iterator as a Vec of (copied) indices
+    /// TODO: turn this into an iterator
+    fn collect_indices_ref(self) -> Vec<Self::I>
     where
         Self: Sized
     {
@@ -242,28 +261,19 @@ impl<S, F, O> IndexedStream for MappedStream<S, F, O>
     type I = S::I;
     type V = O;
 
-    fn valid(&self) -> bool {
-        self.stream.valid()
-    }
-
-    fn ready(&self) -> bool {
-        self.stream.ready()
+    fn current(&self) -> StreamResult<Self::I, Self::V> {
+        match self.stream.current() {
+            StreamResult::Done => StreamResult::Done,
+            StreamResult::Yield { index, value } => StreamResult::Yield { index, value: value.map(|v| (self.map)(index, v)) }
+        }
     }
 
     fn seek(&mut self, index: Self::I, strict: bool) {
         self.stream.seek(index, strict);
     }
 
-    fn next(&mut self) {
-        self.stream.next();
-    }
-
-    fn index(&self) -> Self::I {
-        self.stream.index()
-    }
-
-    fn value(&self) -> Self::V {
-        (self.map)(self.stream.index(), self.stream.value())
+    fn next(&mut self, index: Self::I, strict: bool) {
+        self.stream.next(index, strict);
     }
 
     fn try_fold<B, FF, R>(&mut self, init: B, mut f: FF) -> ControlFlow<R, B> where
@@ -297,28 +307,19 @@ where
     type I = S::I;
     type V = V;
 
-    fn valid(&self) -> bool {
-        self.stream.valid()
-    }
-
-    fn ready(&self) -> bool {
-        self.stream.ready()
+    fn current(&self) -> StreamResult<Self::I, Self::V> {
+        match self.stream.current() {
+            StreamResult::Done => StreamResult::Done,
+            StreamResult::Yield { index, value } => StreamResult::Yield { index, value: value.cloned() }
+        }
     }
 
     fn seek(&mut self, index: Self::I, strict: bool) {
         self.stream.seek(index, strict);
     }
 
-    fn next(&mut self) {
-        self.stream.next();
-    }
-
-    fn index(&self) -> Self::I {
-        self.stream.index()
-    }
-
-    fn value(&self) -> Self::V {
-        self.stream.value().clone()
+    fn next(&mut self, index: Self::I, strict: bool) {
+        self.stream.next(index, strict);
     }
 
     fn try_fold<B, F, R>(&mut self, init: B, mut f: F) -> ControlFlow<R, B>
@@ -328,48 +329,3 @@ where
         self.stream.try_fold(init, |acc, i, v| f(acc, i, v.clone()))
     }
 }
-
-/// A stream iterator that produces a dense stream of values at every index
-/// filling in values with a default zero value if now value is provided
-pub struct DenseStreamIterator<S> {
-    index: usize,
-    stream: S
-}
-
-impl<S> DenseStreamIterator<S> {
-    pub fn from_stream_iterator(stream: S) -> Self {
-        DenseStreamIterator { index: 0, stream }
-    }
-}
-
-impl<S> Iterator for DenseStreamIterator<S>
-    where S: IndexedStream<I = usize>,
-          S::V: Zero
-{
-    type Item = S::V;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.stream.valid() {
-            let i = self.stream.index();
-            if self.index < i {
-                self.index += 1;
-                Some(S::V::zero())
-            } else if self.stream.ready() {
-                self.index += 1;
-                let v = self.stream.value();
-                self.stream.next();
-                Some(v)
-            } else {
-                self.stream.seek(self.index, false);
-                None
-            }
-        } else {
-            None
-        }
-    }    
-}
-
-
-pub trait CloneableIndexedStream: IndexedStream + Clone {}
-
-impl<S> CloneableIndexedStream for S where S: IndexedStream + Clone {}

@@ -2,7 +2,7 @@ use std::ops::ControlFlow;
 
 use replace_with::{replace_with_or_abort, replace_with_or_abort_and_return};
 
-use super::stream_defs::{IndexedStream, IntoStreamIterator};
+use super::stream_defs::{IndexedStream, IntoStreamIterator, StreamResult};
 
 
 /// A stream that chains two streams together, using the second stream when the first stream is exhausted.
@@ -44,20 +44,6 @@ where
     type I = I;
     type V = V;
     
-    fn valid(&self) -> bool {
-        match &self {
-            ChainStream::First { .. } => true,
-            ChainStream::Second { stream: b } => b.valid(),
-        }
-    }
-    
-    fn ready(&self) -> bool {
-        match &self {
-            ChainStream::First { stream: a, .. } => a.ready(),
-            ChainStream::Second { stream: b } => b.ready(),
-        }
-    }
-    
     fn seek(&mut self, index: Self::I, strict: bool) {
         replace_with_or_abort(self, |self_| {
             match self_ {
@@ -66,7 +52,8 @@ where
                     a.seek(index, strict);
                     if !a.valid() {
                         let b = f(a);
-                        debug_assert!(!b.valid() || old_index <= b.index());
+                        let new_index = b.index();
+                        debug_assert!(old_index.is_some() && (new_index.is_none() || old_index.unwrap() <= new_index.unwrap()));
                         ChainStream::Second { stream: b }
                     } else {
                         ChainStream::First { stream: a, f }
@@ -79,40 +66,34 @@ where
             }
         });
     }
-
-    fn next(&mut self) {
+    
+    fn next(&mut self, index: Self::I, strict: bool) {
         replace_with_or_abort(self, |self_| {
             match self_ {
                 ChainStream::First { stream: mut a, f } => {
                     let old_index = a.index();
-                    a.next();
+                    a.next(index, strict);
                     if !a.valid() {
                         let b = f(a);
-                        debug_assert!(!b.valid() || old_index <= b.index());
+                        let new_index = b.index();
+                        debug_assert!(old_index.is_some() && (new_index.is_none() || old_index.unwrap() <= new_index.unwrap()));
                         ChainStream::Second { stream: b }
                     } else {
                         ChainStream::First { stream: a, f }
                     }
                 },
                 ChainStream::Second { stream: mut b } => {
-                    b.next();
+                    b.next(index, strict);
                     ChainStream::Second { stream: b }
                 }
             }
         });
     }
-    
-    fn index(&self) -> Self::I {
+
+    fn current(&self) -> StreamResult<Self::I, Self::V> {
         match &self {
-            ChainStream::First { stream: a, .. } => a.index(),
-            ChainStream::Second { stream: b } => b.index(),
-        }
-    }
-    
-    fn value(&self) -> Self::V {
-        match &self {
-            ChainStream::First { stream: a, .. } => a.value(),
-            ChainStream::Second { stream: b } => b.value(),
+            ChainStream::First { stream: a, .. } => a.current(),
+            ChainStream::Second { stream: b } => b.current(),
         }
     }
 
@@ -169,51 +150,30 @@ where
     type I = A::I;
     type V = A::V;
     
-    fn valid(&self) -> bool {
-        self.first.valid() || self.second.valid()
-    }
-    
-    fn ready(&self) -> bool {
-        if self.first.valid() {
-            self.first.ready()
-        } else {
-            self.second.ready()
-        }
-    }
-    
     fn seek(&mut self, index: Self::I, strict: bool) {
         if self.first.valid() {
             let old_index = self.first.index();
             self.first.seek(index, strict);
-            debug_assert!(self.first.valid() || !self.second.valid() || old_index <= self.second.index());
+            debug_assert!(self.first.valid() || !self.second.valid() || old_index.unwrap() <= self.second.index().unwrap());
         } else {
             self.second.seek(index, strict);
         }
     }
 
-    fn next(&mut self) {
+    fn next(&mut self, index: Self::I, strict: bool) {
         if self.first.valid() {
             let old_index = self.first.index();
-            self.first.next();
-            debug_assert!(self.first.valid() || !self.second.valid() || old_index <= self.second.index());
+            self.first.next(index, strict);
+            debug_assert!(self.first.valid() || !self.second.valid() || old_index.unwrap() <= self.second.index().unwrap());
         } else {
-            self.second.next();
+            self.second.next(index, strict);
         }
     }
     
-    fn index(&self) -> Self::I {
-        if self.first.valid() {
-            self.first.index()
-        } else {
-            self.second.index()
-        }
-    }
-    
-    fn value(&self) -> Self::V {
-        if self.first.valid() {
-            self.first.value()
-        } else {
-            self.second.value()
+    fn current(&self) -> StreamResult<Self::I, Self::V> {
+        match self.first.current() {
+            StreamResult::Done => self.second.current(),
+            StreamResult::Yield { index, value } => StreamResult::Yield { index, value }
         }
     }
 
@@ -227,7 +187,7 @@ where
 #[cfg(test)]
 
 mod chain_test {
-    use crate::streams::{chain::ChainStream, sorted_vec::SortedVecGalloper, stream_defs::IndexedStream};
+    use crate::streams::{chain::ChainStream, sorted_vec::SortedVecGalloper, stream_defs::{IndexedStream, StreamResult}};
 
     use super::FixedChainStream;
 
@@ -238,7 +198,10 @@ mod chain_test {
             SortedVecGalloper::new(&[1, 2, 3, 4, 5]),
             SortedVecGalloper::new(&[6, 7, 8, 9, 10]),
         );
-        assert_eq!(stream.clone().collect_indices(), vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+        assert_eq!(
+            stream.collect_indices(),
+            vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        );
     }
 
     #[test]
@@ -247,16 +210,16 @@ mod chain_test {
             SortedVecGalloper::new(&[1, 2, 3, 4, 5]),
             SortedVecGalloper::new(&[6, 7, 8, 9, 10]),
         );
-        stream.seek(3, false);
-        assert_eq!(stream.index(), 3);
-        stream.seek(3, true);
-        assert_eq!(stream.index(), 4);
-        stream.seek(5, true);
-        assert_eq!(stream.index(), 6);
-        stream.seek(6, false);
-        assert_eq!(stream.index(), 6);
-        stream.seek(4, false);
-        assert_eq!(stream.index(), 6);
+        stream.seek(&3, false);
+        assert_eq!(stream.current(), StreamResult::Yield { index: &3, value: Some(()) });
+        stream.seek(&3, true);
+        assert_eq!(stream.current(), StreamResult::Yield { index: &4, value: Some(()) });
+        stream.seek(&5, true);
+        assert_eq!(stream.current(), StreamResult::Yield { index: &6, value: Some(()) });
+        stream.seek(&6, false);
+        assert_eq!(stream.current(), StreamResult::Yield { index: &6, value: Some(()) });
+        stream.seek(&4, false);
+        assert_eq!(stream.current(), StreamResult::Yield { index: &6, value: Some(()) });
     }
 
 
@@ -267,7 +230,10 @@ mod chain_test {
             SortedVecGalloper::new(&[1, 2, 3, 4, 5]),
             |_| SortedVecGalloper::new(&[6, 7, 8, 9, 10]),
         );
-        assert_eq!(stream.clone().collect_indices(), vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+        assert_eq!(
+            stream.collect_indices(),
+            vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        );
     }
 
     #[test]
@@ -276,15 +242,15 @@ mod chain_test {
             SortedVecGalloper::new(&[1, 2, 3, 4, 5]),
             |_| SortedVecGalloper::new(&[6, 7, 8, 9, 10]),
         );
-        stream.seek(3, false);
-        assert_eq!(stream.index(), 3);
-        stream.seek(3, true);
-        assert_eq!(stream.index(), 4);
-        stream.seek(5, true);
-        assert_eq!(stream.index(), 6);
-        stream.seek(6, false);
-        assert_eq!(stream.index(), 6);
-        stream.seek(4, false);
-        assert_eq!(stream.index(), 6);
+        stream.seek(&3, false);
+        assert_eq!(stream.current(), StreamResult::Yield { index: &3, value: Some(()) });
+        stream.seek(&3, true);
+        assert_eq!(stream.current(), StreamResult::Yield { index: &4, value: Some(()) });
+        stream.seek(&5, true);
+        assert_eq!(stream.current(), StreamResult::Yield { index: &6, value: Some(()) });
+        stream.seek(&6, false);
+        assert_eq!(stream.current(), StreamResult::Yield { index: &6, value: Some(()) });
+        stream.seek(&4, false);
+        assert_eq!(stream.current(), StreamResult::Yield { index: &6, value: Some(()) });
     }
 }

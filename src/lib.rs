@@ -8,7 +8,6 @@ mod test {
     use crate::streams::sorted_vec::SortedVecGalloper;
     use crate::streams::sparse_vec::SparseVec;
     
-    use crate::streams::stream_defs::DenseStreamIterator;
     use crate::streams::stream_defs::IntoStreamIterator;
     use crate::streams::stream_defs::FromStreamIterator;
     use crate::streams::stream_defs::IndexedStream;
@@ -24,7 +23,7 @@ mod test {
         let prod = v1.stream_iter_linear().cloned().zip_with(v2.stream_iter().cloned(), mul);
         let mut result = Vec::with_capacity(v1.len().min(v2.len()));
         result.extend_from_stream_iterator(prod);
-        assert_eq!(result, vec![(1, 28), (33, 27)]);
+        assert_eq!(result, vec![(&1, 28), (&33, 27)]);
     }
 
     #[test]
@@ -35,7 +34,7 @@ mod test {
         let prod2 = v1.stream_iter_linear().cloned().zip_with(v2.stream_iter_linear().cloned(), mul).zip_with(v3.stream_iter_linear().cloned(), mul);
         let mut result2 = Vec::with_capacity(v1.len().min(v2.len()).min(v3.len()));
         result2.extend_from_stream_iterator(prod2);
-        assert_eq!(result2, vec![(1, -56)]);
+        assert_eq!(result2, vec![(&1, -56)]);
     }
 
     #[test]
@@ -45,7 +44,7 @@ mod test {
         let prod3 = v4.stream_iter().cloned().zip_with(v1.stream_iter().cloned(), mul);
         let mut result3 = SparseVec::with_capacity(v4.len().min(v1.len()));
         result3.extend_from_stream_iterator(prod3);
-        assert_eq!(result3, SparseVec::from_iter([(20, 10), (33, 21)]));
+        assert_eq!(result3, SparseVec::from_iter([(&20, 10), (&33, 21)]));
     }
 
     #[test]
@@ -62,8 +61,8 @@ mod test {
         let prod4 = mat1.into_stream_iterator()
             .map(|_, v| v.cloned().zip_with(v3.stream_iter().cloned(), mul));
         let sum2 = prod4.map(|_i, v| v.contract());
-        let result5: Vec<i32> = DenseStreamIterator::from_stream_iterator(sum2).into_iter().collect();
-        assert_eq!(result5, vec![-4, 37]);
+        let result5: Vec<(usize, i32)> = sum2.collect();
+        assert_eq!(result5, vec![(0, -4), (1, 37)]);
     }
 
 

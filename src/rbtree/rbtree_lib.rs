@@ -18,6 +18,7 @@ use std::ptr;
 
 use crate::streams::stream_defs::IndexedStream;
 use crate::streams::stream_defs::IntoStreamIterator;
+use crate::streams::stream_defs::StreamResult;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum Color {
@@ -767,12 +768,12 @@ impl<'a, K: Ord + 'a, V: 'a> DoubleEndedIterator for Iter<'a, K, V> {
 }
 
 #[derive(Clone)]
-pub struct IndexedStreamIter<'a, K: Ord + Copy + 'a, V: 'a> {
+pub struct IndexedStreamIter<'a, K: Ord + 'a, V: 'a> {
     head: NodePtr<K, V>,
     _marker: marker::PhantomData<&'a ()>,
 }
 
-impl<'a, K: Ord + Copy, V> RBTree<K, V> {
+impl<'a, K: Ord, V> RBTree<K, V> {
     pub fn stream_iter(&self) -> IndexedStreamIter<'_, K, V> {
         IndexedStreamIter {
             head: self.first_child(),
@@ -781,8 +782,8 @@ impl<'a, K: Ord + Copy, V> RBTree<K, V> {
     }
 } 
 
-impl<'a, K: Ord + Copy, V> IntoStreamIterator for &'a RBTree<K, V> {
-    type IndexType = K;
+impl<'a, K: Ord, V> IntoStreamIterator for &'a RBTree<K, V> {
+    type IndexType = &'a K;
     type ValueType = &'a V;
     type StreamType = IndexedStreamIter<'a, K, V>;
 
@@ -793,41 +794,34 @@ impl<'a, K: Ord + Copy, V> IntoStreamIterator for &'a RBTree<K, V> {
 
 impl<'a, K, V> IndexedStream for IndexedStreamIter<'a, K, V>
 where
-    K: Ord + Copy + 'a,
+    K: Ord + 'a,
     V: 'a
 {
-    type I = K;
+    type I = &'a K;
     type V = &'a V;
 
-    fn valid(&self) -> bool {
-        !self.head.is_null()
+    fn current(&self) -> StreamResult<Self::I, Self::V> {
+        if self.head.is_null() {
+            StreamResult::Done
+        } else {
+            StreamResult::Yield {
+                index: unsafe { &(*self.head.0).key },
+                value: Some(unsafe { &(*self.head.0).value }),
+            }
+        }
     }
 
-    fn ready(&self) -> bool {
-        true
-    }
-
-    fn index(&self) -> Self::I {
-        assert!(self.valid());
-        unsafe { (*self.head.0).key }
-    }
-
-    fn value(&self) -> Self::V {
-        assert!(self.valid());
-        unsafe { &(*self.head.0).value }
-    }
-
-    fn next(&mut self) {
+    fn next(&mut self, _index: &K, _strict: bool) {
         assert!(self.valid());
         self.head = self.head.next();
     }
 
-    fn seek(&mut self, k: K, strict: bool) {
+    fn seek(&mut self, k: &K, strict: bool) {
         assert!(self.valid());
         if strict {
-            self.head = self.head.seek(|k2| *k2 <= k);
+            self.head = self.head.seek(|k2| k2 <= k);
         } else {
-            self.head = self.head.seek(|k2| *k2 < k);
+            self.head = self.head.seek(|k2| k2 < k);
         }
     }
 }

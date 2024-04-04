@@ -1,4 +1,4 @@
-use super::{binary_search::binary_search, stream_defs::IndexedStream};
+use super::{binary_search::binary_search, stream_defs::{IndexedStream, StreamResult}};
 
 #[derive(Debug, Clone)]
 pub struct SortedVecGalloper<'a, T> {
@@ -24,51 +24,53 @@ impl<'a, T> SortedVecLinear<'a, T> {
     }
 }
 
-impl<T: Ord + Copy> IndexedStream for SortedVecGalloper<'_, T> {
-    type I = T;
+impl<'a, T: Ord> IndexedStream for SortedVecGalloper<'a, T> {
+    type I = &'a T;
     type V = ();
 
-    fn valid(&self) -> bool {
-        self.cur < self.inds.len()
+    fn seek(&mut self, index: Self::I, strict: bool) {
+        self.cur += binary_search(&self.inds[self.cur..], index, strict);
     }
 
-    fn ready(&self) -> bool {
-        true
+    fn next(&mut self, _index: Self::I, _strict: bool) {
+        self.cur += 1;
     }
 
-    fn seek(&mut self, index: T, strict: bool) {
-        self.cur += binary_search(&self.inds[self.cur..], &index, strict);
+    fn current(&self) -> StreamResult<Self::I, Self::V> {
+        if self.cur < self.inds.len() {
+            StreamResult::Yield {
+                index: &self.inds[self.cur],
+                value: Some(()),
+            }
+        } else {
+            StreamResult::Done
+        }
     }
-
-    fn index(&self) -> T {
-        self.inds[self.cur].clone()
-    }
-
-    fn value(&self) -> () {}
 }
 
-impl<T: Ord + Copy> IndexedStream for SortedVecLinear<'_, T> {
-    type I = T;
+impl<'a, T: Ord> IndexedStream for SortedVecLinear<'a, T> {
+    type I = &'a T;
     type V = ();
 
-    fn valid(&self) -> bool {
-        self.cur < self.inds.len()
-    }
-
-    fn ready(&self) -> bool {
-        true
-    }
-
-    fn seek(&mut self, index: T, strict: bool) {
-        if (strict && self.inds[self.cur] <= index) || (!strict && self.inds[self.cur] < index) {
+    fn seek(&mut self, index: Self::I, strict: bool) {
+        if (strict && self.inds[self.cur] <= *index) || (!strict && self.inds[self.cur] < *index) {
             self.cur += 1;
         }
     }
 
-    fn index(&self) -> T {
-        self.inds[self.cur].clone()
+    fn next(&mut self, _index: Self::I, _strict: bool) {
+        self.cur += 1;
     }
 
-    fn value(&self) -> () {}
+    fn current(&self) -> StreamResult<Self::I, Self::V> {
+        if self.cur < self.inds.len() {
+            StreamResult::Yield {
+                index: &self.inds[self.cur],
+                value: Some(()),
+            }
+        } else {
+            StreamResult::Done
+        }
+    }
 }
 

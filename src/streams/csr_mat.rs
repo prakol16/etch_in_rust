@@ -1,4 +1,4 @@
-use super::{sparse_vec::{SparseVec, SparseVecIterator}, stream_defs::{FromStreamIterator, IntoStreamIterator, IndexedStream}};
+use super::{sparse_vec::{SparseVec, SparseVecIterator}, stream_defs::{FromStreamIterator, IndexedStream, IntoStreamIterator, StreamResult}};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SparseCSRMat<T> {
@@ -69,14 +69,6 @@ impl<'a, T> IndexedStream for SparseCSRMatIterator<'a, T> {
     type I = usize;
     type V = SparseVecIterator<'a, usize, T>;
 
-    fn valid(&self) -> bool {
-        self.cur < self.rows.len() - 1
-    }
-
-    fn ready(&self) -> bool {
-        true
-    }
-
     fn seek(&mut self, index: Self::I, strict: bool) {
         self.cur = if strict && index == self.cur {
             index + 1
@@ -85,14 +77,22 @@ impl<'a, T> IndexedStream for SparseCSRMatIterator<'a, T> {
         }
     }
 
-    fn index(&self) -> Self::I {
-        self.cur
+    fn next(&mut self, _index: Self::I, _strict: bool) {
+        self.cur += 1;
     }
 
-    fn value(&self) -> Self::V {
-        let start = self.rows[self.cur];
-        let end = self.rows[self.cur + 1];
-        SparseVecIterator::new(&self.cols[start..end], &self.vals[start..end])
+    fn current(&self) -> StreamResult<Self::I, Self::V> {
+        if self.cur + 1 < self.rows.len() {
+            let start = self.rows[self.cur];
+            let end = self.rows[self.cur + 1];
+            let value = SparseVecIterator::new(&self.cols[start..end], &self.vals[start..end]);
+            StreamResult::Yield {
+                index: self.cur,
+                value: Some(value),
+            }
+        } else {
+            StreamResult::Done
+        }
     }
 }
 

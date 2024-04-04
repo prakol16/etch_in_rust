@@ -27,29 +27,26 @@ pub fn itersect3_manual<I: Ord + Copy>(a: &RBTree<I, ()>, b: &RBTree<I, ()>, c: 
 
 #[test]
 fn test_basic_stream() {
+    use crate::streams::stream_defs::StreamResult;
+    
     let tree: RBTree<u64, u64> = RBTree::from_iter([(1, 1), (2, 1), (3, 2), (4, 3), (5, 5)].into_iter());
     let mut stream = tree.stream_iter();
-    assert_eq!(stream.index(), 1);
-    assert_eq!(*stream.value(), 1);
+    assert_eq!(stream.current(), StreamResult::Yield { index: &1, value: Some(&1) });
 
-    stream.seek(3, false);
-    assert_eq!(stream.index(), 3);
-    assert_eq!(*stream.value(), 2);
+    stream.seek(&3, false);
+    assert_eq!(stream.current(), StreamResult::Yield { index: &3, value: Some(&2) });
 
-    stream.seek(1, true);
-    assert_eq!(stream.index(), 3);
-    assert_eq!(*stream.value(), 2);
+    stream.seek(&1, true);
+    assert_eq!(stream.current(), StreamResult::Yield { index: &3, value: Some(&2) });
 
-    stream.seek(3, true);
-    assert_eq!(stream.index(), 4);
-    assert_eq!(*stream.value(), 3);
+    stream.seek(&3, true);
+    assert_eq!(stream.current(), StreamResult::Yield { index: &4, value: Some(&3) });
 
-    stream.next();
-    assert_eq!(stream.index(), 5);
-    assert_eq!(*stream.value(), 5);
+    stream.next(stream.index().expect("Index should exist"), true);
+    assert_eq!(stream.current(), StreamResult::Yield { index: &5, value: Some(&5) });
 
-    stream.seek(6, false);
-    assert!(!stream.valid());
+    stream.seek(&6, false);
+    assert_eq!(stream.current(), StreamResult::Done);
 }
 
 #[test]

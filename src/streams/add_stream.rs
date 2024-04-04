@@ -1,64 +1,44 @@
-use std::ops::Add;
+use super::stream_defs::{IndexedStream, IntoStreamIterator, StreamResult};
 
-use super::stream_defs::{IntoStreamIterator, IndexedStream};
+// impl<I, L, R> IndexedStream for AddStream<L, R> 
+//     where L: IndexedStream<I=I>,
+//           R: IndexedStream<I=I>,
+//           I: Ord + Copy,
+//           L::V: Add<R::V>, {
+//     type I = I;
+//     type V = <L::V as Add<R::V>>::Output;
 
+//     fn valid(&self) -> bool {
+//         self.left.valid() || self.right.valid()
+//     }
 
-pub struct AddStream<L, R> {
-    left: L,
-    right: R,
-}
+//     fn ready(&self) -> bool {
+//         if self.left.valid() {
+//             if self.right.valid() {
+//                 self.left.index() == self.right.index()
+//             } else {
+//                 self.left.ready()
+//             }
+//         } else if self.right.valid() {
+//             self.right.ready()
+//         } else {
+//             panic!("AddStream::ready called when neither stream is valid")
+//         }
+//     }
 
-impl<L, R> AddStream<L, R> {
-    pub fn add(
-        left: impl IntoStreamIterator<StreamType = L>,
-        right: impl IntoStreamIterator<StreamType = R>
-    ) -> Self {
-        AddStream {
-            left: left.into_stream_iterator(),
-            right: right.into_stream_iterator(),
-        }
-    }
-}
+//     fn seek(&mut self, index: I, strict: bool) {
+//         self.left.seek(index, strict);
+//         self.right.seek(index, strict);
+//     }
 
-impl<I, L, R> IndexedStream for AddStream<L, R> 
-    where L: IndexedStream<I=I>,
-          R: IndexedStream<I=I>,
-          I: Ord + Copy,
-          L::V: Add<R::V>, {
-    type I = I;
-    type V = <L::V as Add<R::V>>::Output;
+//     fn index(&self) -> I {
+//         self.left.index().min(self.right.index())
+//     }
 
-    fn valid(&self) -> bool {
-        self.left.valid() || self.right.valid()
-    }
-
-    fn ready(&self) -> bool {
-        if self.left.valid() {
-            if self.right.valid() {
-                self.left.index() == self.right.index()
-            } else {
-                self.left.ready()
-            }
-        } else if self.right.valid() {
-            self.right.ready()
-        } else {
-            panic!("AddStream::ready called when neither stream is valid")
-        }
-    }
-
-    fn seek(&mut self, index: I, strict: bool) {
-        self.left.seek(index, strict);
-        self.right.seek(index, strict);
-    }
-
-    fn index(&self) -> I {
-        self.left.index().min(self.right.index())
-    }
-
-    fn value(&self) -> Self::V {
-        self.left.value() + self.right.value()
-    }
-}
+//     fn value(&self) -> Self::V {
+//         self.left.value() + self.right.value()
+//     }
+// }
 
 #[derive(Debug, Clone)]
 pub enum EitherOrBoth<A, B> {
@@ -97,32 +77,27 @@ impl<I, V, L, R, F> IndexedStream for IntersectingUnionStream<L, R, F>
     type I = I;
     type V = V;
 
-    fn valid(&self) -> bool {
-        self.left.valid() && self.right.valid()
-    }
-
-    fn ready(&self) -> bool {
-        match self.left.index().cmp(&self.right.index()) {
-            std::cmp::Ordering::Less => self.left.ready(),
-            std::cmp::Ordering::Equal => self.left.ready() && self.right.ready(),
-            std::cmp::Ordering::Greater => self.right.ready(),
-        }
-    }
-
     fn seek(&mut self, index: I, strict: bool) {
         self.left.seek(index, strict);
         self.right.seek(index, strict);
     }
 
-    fn index(&self) -> I {
-        self.left.index().min(self.right.index())
-    }
-
-    fn value(&self) -> Self::V {
-        match self.left.index().cmp(&self.right.index()) {
-            std::cmp::Ordering::Less => (self.f)(EitherOrBoth::Left(self.left.value())),
-            std::cmp::Ordering::Equal => (self.f)(EitherOrBoth::Both(self.left.value(), self.right.value())),
-            std::cmp::Ordering::Greater => (self.f)(EitherOrBoth::Right(self.right.value())),
+    fn current(&self) -> StreamResult<Self::I, Self::V> {
+        match (self.left.current(), self.right.current()) {
+            (StreamResult::Yield { index: li, value: lv },
+             StreamResult::Yield { index: ri, value: rv }) => {
+                StreamResult::Yield {
+                    index: std::cmp::min(li, ri),
+                    value: (|| {
+                        match li.cmp(&ri) {
+                            std::cmp::Ordering::Less => Some((self.f)(EitherOrBoth::Left(lv?))),
+                            std::cmp::Ordering::Equal => Some((self.f)(EitherOrBoth::Both(lv?, rv?))),
+                            std::cmp::Ordering::Greater => Some((self.f)(EitherOrBoth::Right(rv?))),
+                        }
+                    })()
+                }
+            },
+            _ => StreamResult::Done
         }
     }
 }
