@@ -14,8 +14,8 @@ fn gen_random_sorted_strings(n: usize, sparsity: usize) -> Vec<String> {
     strings
 }
 
-fn gen_random_sorted_ints(n: usize, sparsity: u32) -> Vec<u32> {
-    let mut rng = StdRng::seed_from_u64(420);
+fn gen_random_sorted_ints(n: usize, sparsity: u32, seed: u64) -> Vec<u32> {
+    let mut rng = StdRng::seed_from_u64(420 + seed);
     let mut numbers: Vec<u32> = (0..sparsity*n as u32).collect();
     numbers.shuffle(&mut rng);
     numbers.truncate(n);
@@ -54,8 +54,8 @@ fn triangle_query_benchmark(c: &mut Criterion) {
 }
 
 fn sorted_vec_sparse_intersect_benchmark(c: &mut Criterion) {
-    let s1 = gen_random_sorted_ints(100, 10_000);
-    let s2 = gen_random_sorted_ints(100_000, 10);
+    let s1 = gen_random_sorted_ints(100, 10_000, 0);
+    let s2 = gen_random_sorted_ints(100_000, 10, 1);
 
     let mut group = c.benchmark_group("inter.sparse");
     group.bench_function("inter.sparse.indexed_streams", |b|
@@ -70,8 +70,8 @@ fn sorted_vec_sparse_intersect_benchmark(c: &mut Criterion) {
 }
 
 fn sorted_vec_dense_intersect_benchmark(c: &mut Criterion) {
-    let s1 = gen_random_sorted_ints(1_000_000, 10);
-    let s2 = gen_random_sorted_ints(1_000_000, 10);
+    let s1 = gen_random_sorted_ints(1_000_000, 10, 0);
+    let s2 = gen_random_sorted_ints(1_000_000, 10, 1);
 
     let mut group = c.benchmark_group("inter.dense");
     group.bench_function("inter.dense.indexed_streams", |b|
@@ -86,9 +86,9 @@ fn sorted_vec_dense_intersect_benchmark(c: &mut Criterion) {
 }
 
 fn rbtree_intersect_benchmark(c: &mut Criterion) {
-    let tree_a = gen_random_sorted_ints(1_000_000, 10).into_iter().map(|x| (x, ())).collect();
-    let tree_b = gen_random_sorted_ints(1_000_000, 10).into_iter().map(|x| (x, ())).collect();
-    let tree_c = gen_random_sorted_ints(1_000_000, 10).into_iter().map(|x| (x, ())).collect();
+    let tree_a = gen_random_sorted_ints(1_000_000, 10, 0).into_iter().map(|x| (x, ())).collect();
+    let tree_b = gen_random_sorted_ints(1_000_000, 10, 1).into_iter().map(|x| (x, ())).collect();
+    let tree_c = gen_random_sorted_ints(1_000_000, 10, 2).into_iter().map(|x| (x, ())).collect();
 
     let mut group = c.benchmark_group("rbtree");
     group.bench_function("rbtree.intersect2_iterators", |b| {
