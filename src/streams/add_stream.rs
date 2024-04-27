@@ -40,11 +40,25 @@ use super::stream_defs::{IndexedStream, IntoStreamIterator, StreamResult};
 //     }
 // }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum EitherOrBoth<A, B> {
     Left(A),
     Right(B),
     Both(A, B),
+}
+
+impl<A, B> EitherOrBoth<A, B> {
+    pub fn map<Fa, Fb, Oa, Ob>(self, fa: Fa, fb: Fb) -> EitherOrBoth<Oa, Ob>
+    where
+        Fa: FnOnce(A) -> Oa,
+        Fb: FnOnce(B) -> Ob,
+    {
+        match self {
+            EitherOrBoth::Left(a) => EitherOrBoth::Left(fa(a)),
+            EitherOrBoth::Right(b) => EitherOrBoth::Right(fb(b)),
+            EitherOrBoth::Both(a, b) => EitherOrBoth::Both(fa(a), fb(b)),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

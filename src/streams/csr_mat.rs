@@ -39,19 +39,17 @@ impl<T> FromIterator<(usize, usize, T)> for SparseCSRMat<T> {
         let mut rows = Vec::new();
         let mut cols = Vec::new();
         let mut vals = Vec::new();
-        let mut current_row: Option<usize> = None;
         let mut row_counts = 0;
 
         for (row, col, val) in iter {
-            if Some(row) != current_row {
+            while rows.len() <= row {
                 rows.push(row_counts);
-                current_row = Some(row);
             }
             cols.push(col);
             vals.push(val);
             row_counts += 1;
         }
-        rows.push(row_counts); // Add the final count to rows
+        rows.push(row_counts);
 
         SparseCSRMat { rows, cols, vals }
     }
