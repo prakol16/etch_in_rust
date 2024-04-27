@@ -1,3 +1,5 @@
+use num_traits::Zero;
+
 use super::{binary_search::binary_search, stream_defs::{FromStreamIterator, IndexedStream, IntoStreamIterator}};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -13,6 +15,20 @@ impl<I, T> FromIterator<(I, T)> for SparseVec<I, T> {
     fn from_iter<V: IntoIterator<Item = (I, T)>>(v: V) -> Self {
         let (inds, vals) = v.into_iter().unzip();
         SparseVec { inds, vals }
+    }
+}
+
+impl<I, T> SparseVec<I, T> {
+    pub fn iter(&self) -> std::iter::Zip<std::slice::Iter<I>, std::slice::Iter<T>> {
+        self.inds.iter().zip(self.vals.iter())
+    }
+}
+
+impl<I: PartialEq, V: Zero + PartialEq> SparseVec<I, V> {
+    pub fn eq_ignoring_zeros(&self, other: &Self) -> bool {
+        self.iter()
+            .filter(|(_, v)| !V::is_zero(v))
+            .eq(other.iter().filter(|(_, v)| !V::is_zero(v)))
     }
 }
 

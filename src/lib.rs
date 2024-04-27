@@ -4,6 +4,8 @@ pub mod examples;
 
 #[cfg(test)]
 mod test {
+    use std::iter;
+
     use crate::streams::csr_mat::SparseCSRMat;
     use crate::streams::sorted_vec::SortedVecGalloper;
     use crate::streams::sparse_vec::SparseVec;
@@ -66,6 +68,21 @@ mod test {
         assert_eq!(result5, vec![-4, 37]);
     }
 
+    #[test]
+    fn test_matvecmul2() {
+        let mat = SparseCSRMat::from_iter([(1, 0, 1)]);
+        let vec = SparseVec::from_iter([(0, 1)]);
+        let prod = mat.into_stream_iterator()
+            .map(|_, v| v.cloned().zip_with(vec.stream_iter().cloned(), mul).contract());
+        let result: Vec<i32> = DenseStreamIterator::from_stream_iterator(prod).into_iter().collect();
+        assert_eq!(result, vec![0, 1]);
+    }
+
+    #[test]
+    fn test_csrmat_empty() {
+        let mat: SparseCSRMat<i32> = SparseCSRMat::from_iter(iter::empty());
+        assert_eq!(mat, SparseCSRMat::empty());
+    }
 
     #[test]
     fn sorted_vec_galloper() {
@@ -81,4 +98,143 @@ mod test {
     //         [(1, SparseVec::from_iter([(1, 2), (2, 3)]))]
     //     );
     // }
+}
+
+#[cfg(test)]
+mod proptests {
+    use std::{collections::BTreeMap, num::Wrapping, ops::{Add, AddAssign, Mul}};
+
+    use num_traits::Zero;
+    use quickcheck_macros::quickcheck;
+
+    use crate::streams::{add_stream::EitherOrBoth, csr_mat::SparseCSRMat, sparse_vec::SparseVec, stream_defs::{IndexedStream, IntoStreamIterator}};
+
+    fn intersect_maps<I, V1, V2>(a: BTreeMap<I, V1>, b: BTreeMap<I, V2>) -> BTreeMap<I, (V1, V2)>
+    where
+        I: Ord + Clone + PartialEq,
+        V1: Clone,
+        V2: Clone
+    {
+        let mut result = BTreeMap::new();
+        for (k, v) in a.iter() {
+            if let Some(v2) = b.get(k) {
+                result.insert(k.clone(), (v.clone(), v2.clone()));
+            }
+        }
+        result
+    }
+
+    #[quickcheck]
+    fn test_zip(a: BTreeMap<u8, usize>, b: BTreeMap<u8, usize>) {
+        let vec_a = a.iter().map(|(k, v)| (*k, *v)).collect::<SparseVec<_, _>>();
+        let vec_b = b.iter().map(|(k, v)| (*k, *v)).collect::<SparseVec<_, _>>();
+        let zipped = vec_a.stream_iter()
+            .zip_with(vec_b.stream_iter(), |a, b| (*a, *b));
+        let result: SparseVec<u8, (usize, usize)> = zipped.collect();
+        let expected = intersect_maps(a, b);
+        assert_eq!(result, expected.iter().map(|(k, (v1, v2))| (*k, (*v1, *v2))).collect());
+    }
+
+    #[quickcheck]
+    fn test_matvecmul(a: Vec<BTreeMap<u8, Wrapping<i64>>>, b: BTreeMap<u8, Wrapping<i64>>) {
+        let csr_a = a.iter()
+            .enumerate()
+            .flat_map(|(i, row )| row.iter().map(move |(k, v)| (i, *k as usize, *v)))
+            .collect::<SparseCSRMat<_>>();
+        let vec_b = b.iter().map(|(k, v)| (*k as usize, *v)).collect::<SparseVec<_, _>>();
+        let prod = csr_a.into_stream_iterator()
+            .map(|_, v| 
+                v.zip_with(vec_b.stream_iter(), |a, b| a * b)
+                .contract()
+            );
+        let result: SparseVec<usize, _> = prod.collect::<SparseVec<usize, _>>();
+        let expected: SparseVec<usize, _> = a.iter()
+            .map(|row| 
+                row.iter()
+                    .map(|(k, v)| v * *b.get(k).unwrap_or(&Wrapping(0)))
+                    .sum()
+            )
+            .enumerate()
+            .collect();
+        assert!(result.eq_ignoring_zeros(&expected), "result: {:?}, expected: {:?}", result, expected);
+    }
+
+    #[quickcheck]
+    fn test_csr_roundtrip(a: Vec<BTreeMap<u8, i64>>) {
+        let csr_a = a.iter()
+            .enumerate()
+            .flat_map(|(i, row )| row.iter().map(move |(k, v)| (i, *k as usize, *v)))
+            .collect::<SparseCSRMat<_>>();
+        let round_trip = csr_a.into_stream_iterator()
+            .map(|_, s| s.cloned())
+            .collect::<SparseCSRMat<_>>();
+        assert_eq!(csr_a, round_trip);
+    }
+
+    fn sum_matmul_maps<I, J, V>(m1: Vec<BTreeMap<I, V>>, m2: Vec<BTreeMap<J, V>>) -> V
+    where
+        I: Ord + Clone,
+        J: Ord + Clone,
+        V: Add + Mul<V, Output = V> + Clone + AddAssign + Zero,
+    {
+        let mut result = V::zero();
+        for (i, row) in m1.iter().enumerate() {
+            for (_, v1) in row.iter() {
+                if let Some(m2_row) = m2.get(i) {
+                    for (_, v2) in m2_row.iter() {
+                        result += v1.clone() * v2.clone();
+                    }
+                }
+            }
+        }
+        result
+    }
+
+    #[quickcheck]
+    fn test_matmul(a: Vec<BTreeMap<u8, Wrapping<i64>>>, b: Vec<BTreeMap<u8, Wrapping<i64>>>) {
+        let csr_a = a.iter().enumerate()
+            .flat_map(|(i, row)| row.iter().map(move |(k, v)| (i as usize, *k as usize, *v)))
+            .collect::<SparseCSRMat<_>>();
+        let csr_b = b.iter().enumerate()
+            .flat_map(|(i, row)| row.iter().map(move |(k, v)| (i as usize, *k as usize, *v)))
+            .collect::<SparseCSRMat<_>>();
+        let result = csr_a.into_stream_iterator()
+            .zip_with(csr_b.into_stream_iterator(), |r1, r2| {
+            r1.map(move |_, v1| r2.clone().map(|_, v2| v1 * v2).contract()).contract()
+        }).contract();
+        let expected = sum_matmul_maps(a, b);
+        assert_eq!(result, expected);
+    }
+
+    fn union_maps<I, V>(a: &BTreeMap<I, V>, b: &BTreeMap<I, V>) -> BTreeMap<I, EitherOrBoth<V, V>>
+    where
+        I: Ord + Clone,
+        V: Clone
+    {
+        let mut result: BTreeMap<I, EitherOrBoth<V, V>> = a.iter().map(|(k, v)| (k.clone(), EitherOrBoth::Left(v.clone()))).collect();
+        for (k, v) in b.iter() {
+            match result.get_mut(k) {
+                Some(EitherOrBoth::Left(left_val)) => {
+                    *result.get_mut(k).unwrap() = EitherOrBoth::Both(left_val.clone(), v.clone());
+                },
+                _ => {
+                    result.insert(k.clone(), EitherOrBoth::Right(v.clone()));
+                }
+            }
+        }   
+        result
+    }
+
+    #[quickcheck]
+    fn test_union_vec(a: BTreeMap<u8, usize>, b: BTreeMap<u8, usize>) {
+        let vec_a = a.iter().map(|(k, v)| (*k, *v)).collect::<SparseVec<_, _>>();
+        let vec_b = b.iter().map(|(k, v)| (*k, *v)).collect::<SparseVec<_, _>>();
+        let union_ab = 
+            crate::streams::add_stream::union(vec_a.stream_iter(), vec_b.stream_iter(),
+            |x| x.map(|v| *v, |v| *v))
+            .collect::<SparseVec<_, _>>();
+        let expected = union_maps(&a, &b)
+            .into_iter().collect::<SparseVec<_, _>>();
+        assert_eq!(union_ab, expected);
+    }
 }
