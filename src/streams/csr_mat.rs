@@ -1,4 +1,4 @@
-use super::{sparse_vec::{SparseVec, SparseVecIterator}, stream_defs::{FromStreamIterator, IntoStreamIterator, IndexedStream}};
+use super::{sparse_vec::{SparseVec, SparseVecGalloper, SparseVecIterator}, stream_defs::{FromStreamIterator, IndexedStream, IntoStreamIterator}};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SparseCSRMat<T> {
@@ -67,7 +67,7 @@ pub struct SparseCSRMatIterator<'a, T> {
 
 impl<'a, T> IndexedStream for SparseCSRMatIterator<'a, T> {
     type I = usize;
-    type V = SparseVecIterator<'a, usize, T>;
+    type V = SparseVecGalloper<'a, usize, T>;
 
     fn valid(&self) -> bool {
         self.cur < self.rows.len() - 1
@@ -85,6 +85,10 @@ impl<'a, T> IndexedStream for SparseCSRMatIterator<'a, T> {
         }
     }
 
+    fn next(&mut self) {
+        self.cur += 1;
+    }
+
     fn index(&self) -> Self::I {
         self.cur
     }
@@ -92,13 +96,13 @@ impl<'a, T> IndexedStream for SparseCSRMatIterator<'a, T> {
     fn value(&self) -> Self::V {
         let start = self.rows[self.cur];
         let end = self.rows[self.cur + 1];
-        SparseVecIterator::new(&self.cols[start..end], &self.vals[start..end])
+        SparseVecGalloper::new(&self.cols[start..end], &self.vals[start..end])
     }
 }
 
 impl<'a, T> IntoStreamIterator for &'a SparseCSRMat<T> {
     type IndexType = usize;
-    type ValueType = SparseVecIterator<'a, usize, T>;
+    type ValueType = SparseVecGalloper<'a, usize, T>;
     type StreamType = SparseCSRMatIterator<'a, T>;
 
     fn into_stream_iterator(self) -> Self::StreamType {
