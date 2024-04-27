@@ -1,4 +1,4 @@
-use super::{sparse_vec::{SparseVec, SparseVecGalloper, SparseVecIterator}, stream_defs::{FromStreamIterator, IndexedStream, IntoStreamIterator}};
+use super::{sparse_vec::SparseVecGalloper, stream_defs::{FromStreamIterator, IndexedStream, IntoStreamIterator}};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SparseCSRMat<T> {
@@ -115,16 +115,26 @@ impl<'a, T> IntoStreamIterator for &'a SparseCSRMat<T> {
     }
 }
 
-impl<'a, T> FromStreamIterator for SparseCSRMatIterator<'a, T>
+impl<'a, T, S1: IndexedStream<I = usize, V = T>> FromStreamIterator<usize, S1> for SparseCSRMat<T>
 {
-    type IndexType = usize;
-    type ValueType = SparseVec<usize, T>;
-
-    fn from_stream_iterator<I: IndexedStream<I=Self::IndexType, V=Self::ValueType>>(_iter: I) -> Self {
-        todo!()
+    fn from_stream_iterator<S: IndexedStream<I=usize, V=S1>>(iter: S) -> Self {
+        let mut result = SparseCSRMat::empty();
+        result.extend_from_stream_iterator(iter);
+        result
     }
 
-    fn extend_from_stream_iterator<I: IndexedStream<I=Self::IndexType, V=Self::ValueType>>(&mut self, _iter: I) {
-        todo!()
+    fn extend_from_stream_iterator<S: IndexedStream<I=usize, V=S1>>(&mut self, iter: S) {
+        let mut row_counts = *self.rows.last().expect("SparseCSR in invalid state: `rows` is empty");
+        iter.for_each(|i, v| {
+            while self.rows.len() <= i {
+                self.rows.push(row_counts);
+            }
+            v.for_each(|j, x| {
+                row_counts += 1;
+                self.cols.push(j);
+                self.vals.push(x);
+            });
+            self.rows.push(row_counts);
+        });
     }
 }

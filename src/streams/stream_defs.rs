@@ -144,7 +144,7 @@ pub trait IndexedStream {
         ZipStream::new(self, right, f)
     }
 
-    fn collect<O: FromStreamIterator<IndexType = Self::I, ValueType = Self::V>>(self) -> O
+    fn collect<O: FromStreamIterator<Self::I, Self::V>>(self) -> O
     where
         Self: Sized
     {
@@ -192,22 +192,14 @@ impl<S: IndexedStream> IntoStreamIterator for S {
     }
 }
 
-pub trait FromStreamIterator {
-    /// The index type of the stream iterator that can produce T
-    type IndexType;
+pub trait FromStreamIterator<I, V> {
 
-    /// The value type of the stream iterator that can produce T
-    type ValueType;
+    fn from_stream_iterator<S: IndexedStream<I=I, V=V>>(iter: S) -> Self;
 
-    fn from_stream_iterator<I: IndexedStream<I=Self::IndexType, V=Self::ValueType>>(iter: I) -> Self;
-
-    fn extend_from_stream_iterator<I: IndexedStream<I=Self::IndexType, V=Self::ValueType>>(&mut self, iter: I);
+    fn extend_from_stream_iterator<S: IndexedStream<I=I, V=V>>(&mut self, iter: S);
 }
 
-impl<I, V> FromStreamIterator for Vec<(I, V)> {
-    type IndexType = I;
-    type ValueType = V;
-
+impl<I, V> FromStreamIterator<I, V> for Vec<(I, V)> {
     fn from_stream_iterator<Iter: IndexedStream<I=I, V=V>>(iter: Iter) -> Self {
         let mut result = Vec::new();
         result.extend_from_stream_iterator(iter);

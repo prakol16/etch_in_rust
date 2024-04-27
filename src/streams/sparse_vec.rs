@@ -167,10 +167,7 @@ impl<'a, I: Ord + Copy, T> IntoStreamIterator for &'a SparseVec<I, T> {
     }
 }
 
-impl<I: Ord + Clone, T> FromStreamIterator for SparseVec<I, T> {
-    type IndexType = I;
-    type ValueType = T;
-
+impl<I: Ord + Clone, T> FromStreamIterator<I, T> for SparseVec<I, T> {
     fn from_stream_iterator<Iter: IndexedStream<I=I, V=T>>(iter: Iter) -> Self {
         let mut result = SparseVec {
             inds: Vec::new(),
