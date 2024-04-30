@@ -1,11 +1,11 @@
 use std::time::Duration;
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use etch::{examples::{sorted_vec_intersect::{vec_intersect_manual, vec_intersect_streams_gallop, vec_intersect_streams_linear}, tree_iteration::{intersect2_iterators, intersect2_manual, intersect3_iterators, itersect3_manual}, triangle_query::{create_skewed_relation, triangle_query_fused, triangle_query_unfused}}, streams::{sorted_vec::SortedVecGalloper, stream_defs::IndexedStream}};
+use etch::{examples::{sorted_vec_intersect::{vec_intersect_manual, vec_intersect_streams_gallop, vec_intersect_streams_linear}, tree_iteration::{intersect2_iterators, intersect2_manual, intersect3_iterators, itersect3_manual}, triangle_query::{create_skewed_relation, triangle_query_fused, triangle_query_naive, triangle_query_unfused}}, streams::{sorted_vec::SortedVecGalloper, stream_defs::IndexedStream}};
 use rand::{prelude::SliceRandom, rngs::StdRng, SeedableRng};
 
-fn gen_random_sorted_strings(n: usize, sparsity: usize) -> Vec<String> {
-    let mut rng = StdRng::seed_from_u64(1024);
+fn gen_random_sorted_strings(n: usize, sparsity: usize, seed: u64) -> Vec<String> {
+    let mut rng = StdRng::seed_from_u64(1024 + seed);
     let mut numbers: Vec<usize> = (0..sparsity*n).collect();
     numbers.shuffle(&mut rng);
     numbers.truncate(n);
@@ -24,10 +24,10 @@ fn gen_random_sorted_ints(n: usize, sparsity: u32, seed: u64) -> Vec<u32> {
 }
 
 fn triangle_query_benchmark(c: &mut Criterion) {
-    let n = 500;
-    let s1 = gen_random_sorted_strings(n, 2);
-    let s2 = gen_random_sorted_strings(n, 2);
-    let s3 = gen_random_sorted_strings(n, 2);
+    let n = 1000;
+    let s1 = gen_random_sorted_strings(n, 2, 0);
+    let s2 = gen_random_sorted_strings(n, 2, 1);
+    let s3 = gen_random_sorted_strings(n, 2, 2);
     let s1_ref = s1.iter().map(|s| s.as_str()).collect::<Vec<&str>>();
     let s2_ref = s2.iter().map(|s| s.as_str()).collect::<Vec<&str>>();
     let s3_ref = s3.iter().map(|s| s.as_str()).collect::<Vec<&str>>();
@@ -49,6 +49,13 @@ fn triangle_query_benchmark(c: &mut Criterion) {
             r1.stream_iter().map(|_, x| SortedVecGalloper::new(x)),
             r2.stream_iter().map(|_, x| SortedVecGalloper::new(x)),
             r3.stream_iter().map(|_, x| SortedVecGalloper::new(x))
+        )));
+    });
+    group.bench_function("tri.naive", |b| {
+        b.iter(|| black_box(triangle_query_naive(
+            &r1,
+            &r2,
+            &r3
         )));
     });
 }

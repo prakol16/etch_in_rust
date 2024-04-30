@@ -22,6 +22,15 @@ impl<I, T> SparseVec<I, T> {
     pub fn iter(&self) -> std::iter::Zip<std::slice::Iter<I>, std::slice::Iter<T>> {
         self.inds.iter().zip(self.vals.iter())
     }
+
+    pub fn get(&self, index: I) -> Option<&T>
+    where I: Ord
+    {
+        match self.inds.binary_search(&index) {
+            Ok(i) => Some(&self.vals[i]),
+            Err(_) => None,
+        }
+    }
 }
 
 impl<I: PartialEq, V: Zero + PartialEq> SparseVec<I, V> {
