@@ -24,7 +24,7 @@ fn gen_random_sorted_ints(n: usize, sparsity: u32, seed: u64) -> Vec<u32> {
 }
 
 fn triangle_query_benchmark(c: &mut Criterion) {
-    let n = 500;
+    let n = 1000;
     let s1 = gen_random_sorted_strings(n, 2, 0);
     let s2 = gen_random_sorted_strings(n, 2, 1);
     let s3 = gen_random_sorted_strings(n, 2, 2);
@@ -44,6 +44,20 @@ fn triangle_query_benchmark(c: &mut Criterion) {
             r2.stream_iter().map(|_, x| SortedVecGalloper::new(x)),
             r3.stream_iter().map(|_, x| SortedVecGalloper::new(x))
         ))));
+    group.bench_function("tri.unfused", |b| {
+        b.iter(|| black_box(triangle_query_unfused(
+            r1.stream_iter().map(|_, x| SortedVecGalloper::new(x)),
+            r2.stream_iter().map(|_, x| SortedVecGalloper::new(x)),
+            r3.stream_iter().map(|_, x| SortedVecGalloper::new(x))
+        )));
+    });
+    group.bench_function("tri.naive", |b| {
+        b.iter(|| black_box(triangle_query_naive(
+            &r1,
+            &r2,
+            &r3
+        )));
+    });
 }
 
 fn sorted_vec_sparse_intersect_benchmark(c: &mut Criterion) {

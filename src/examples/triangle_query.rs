@@ -46,6 +46,32 @@ pub fn create_skewed_relation<A: Ord + Clone, B: Ord + Clone>(
     }
 }
 
+pub fn triangle_query_naive<A: Ord + Copy, B: Ord + Copy, C: Ord + Copy>(
+    r1: &SparseVec<A, Vec<B>>,
+    r2: &SparseVec<B, Vec<C>>,
+    r3: &SparseVec<A, Vec<C>>,
+) -> SparseVec<A, SparseVec<B, Vec<C>>> {
+    let mut result = SparseVec::empty();
+    for (a, bvec) in r1.iter() {
+        let mut b_result: SparseVec<B, Vec<C>> = SparseVec::empty();
+        for b in bvec.iter() {
+            let mut c_result: Vec<C> = Vec::new();
+            for c in r2.get(*b).unwrap_or(&vec![]).iter() {
+                if let Some(cvec) = r3.get(*a) {
+                    if cvec.binary_search(c).is_ok() {
+                        c_result.push(*c);
+                    }
+                }
+            }
+            b_result.inds.push(*b);
+            b_result.vals.push(c_result);
+        }
+        result.inds.push(*a);
+        result.vals.push(b_result);
+    }
+    result
+}
+
 /// Perform the triangle query on s1, s2, s3
 /// Assumes s1, s2, s3 are sorted
 /// This version is unfused
