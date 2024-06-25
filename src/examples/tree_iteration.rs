@@ -25,43 +25,51 @@ pub fn itersect3_manual<I: Ord + Copy>(a: &RBTree<I, ()>, b: &RBTree<I, ()>, c: 
         .count()
 }
 
-#[test]
-fn test_basic_stream() {
-    let tree: RBTree<u64, u64> = RBTree::from_iter([(1, 1), (2, 1), (3, 2), (4, 3), (5, 5)].into_iter());
-    let mut stream = tree.stream_iter();
-    assert_eq!(stream.index(), 1);
-    assert_eq!(*stream.value(), 1);
+#[cfg(test)]
+mod test {
+    use std::collections::BTreeSet;
 
-    stream.seek(3, false);
-    assert_eq!(stream.index(), 3);
-    assert_eq!(*stream.value(), 2);
+    use quickcheck_macros::quickcheck;
 
-    stream.seek(1, true);
-    assert_eq!(stream.index(), 3);
-    assert_eq!(*stream.value(), 2);
+    use crate::{examples::tree_iteration::{intersect2_iterators, intersect2_manual, intersect3_iterators, itersect3_manual}, rbtree::rbtree_lib::RBTree, streams::stream_defs::IndexedStream};
 
-    stream.seek(3, true);
-    assert_eq!(stream.index(), 4);
-    assert_eq!(*stream.value(), 3);
+    
+    #[test]
+    fn test_basic_stream() {
+        let tree: RBTree<u64, u64> = RBTree::from_iter([(1, 1), (2, 1), (3, 2), (4, 3), (5, 5)].into_iter());
+        let mut stream = tree.stream_iter();
+        assert_eq!(stream.index(), 1);
+        assert_eq!(*stream.value(), 1);
 
-    stream.next();
-    assert_eq!(stream.index(), 5);
-    assert_eq!(*stream.value(), 5);
+        stream.seek(3, false);
+        assert_eq!(stream.index(), 3);
+        assert_eq!(*stream.value(), 2);
 
-    stream.seek(6, false);
-    assert!(!stream.valid());
-}
+        stream.seek(1, true);
+        assert_eq!(stream.index(), 3);
+        assert_eq!(*stream.value(), 2);
 
-#[test]
-fn test_intersection() {
-    fn make_rbset<I: Ord + Copy>(data: impl IntoIterator<Item = I>) -> RBTree<I, ()> {
-        data.into_iter().map(|x| (x, ())).collect()
+        stream.seek(3, true);
+        assert_eq!(stream.index(), 4);
+        assert_eq!(*stream.value(), 3);
+
+        stream.next();
+        assert_eq!(stream.index(), 5);
+        assert_eq!(*stream.value(), 5);
+
+        stream.seek(6, false);
+        assert!(!stream.valid());
     }
-    let tree_a = make_rbset([1, 2, 3, 4, 5]);
-    let tree_b = make_rbset([3, 4, 5, 6, 7]);
-    let tree_c = make_rbset([5, 6, 7, 8, 9]);
-    assert_eq!(intersect2_iterators(&tree_a, &tree_b), 3);
-    assert_eq!(intersect2_manual(&tree_a, &tree_b), 3);
-    assert_eq!(intersect3_iterators(&tree_a, &tree_b, &tree_c), 1);
-    assert_eq!(itersect3_manual(&tree_a, &tree_b, &tree_c), 1);
+
+    #[quickcheck]
+    fn test_intersection(a: BTreeSet<u8>, b: BTreeSet<u8>, c: BTreeSet<u8>) {
+        fn make_rbset<I: Ord + Copy>(data: impl IntoIterator<Item = I>) -> RBTree<I, ()> {
+            data.into_iter().map(|x| (x, ())).collect()
+        }
+        let tree_a = make_rbset(a);
+        let tree_b = make_rbset(b);
+        let tree_c = make_rbset(c);
+        assert_eq!(intersect2_iterators(&tree_a, &tree_b), intersect2_manual(&tree_a, &tree_b));
+        assert_eq!(intersect3_iterators(&tree_a, &tree_b, &tree_c), itersect3_manual(&tree_a, &tree_b, &tree_c));
+    }
 }

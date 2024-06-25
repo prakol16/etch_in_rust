@@ -124,6 +124,12 @@ fn rbtree_intersect_benchmark(c: &mut Criterion) {
             &tree_c
         )))
     });
+    group.bench_function("rbtree.intersect2_self", |b| {
+        b.iter( || black_box(intersect2_iterators(
+            &tree_a,
+            &tree_a
+        )));
+    });
     group.finish();
 }
 
