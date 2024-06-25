@@ -268,7 +268,7 @@ impl<K: Ord, V> NodePtr<K, V> {
                 // Case 2: candidate is a right child
                 // In this case, ancestor does not change when candidate := parent since parent < candidate
                 // so the invariant continues to hold with candidate := parent. Similarly, we don't
-                // need to check the loop condition to see if we should break since target > parent > candidate.
+                // need to check the loop condition to see if we should break since target > candidate > parent.
                 // This entire case could be a no-op. For optimization purposes, however, we do one step
                 // of a binary search for target from current
                 // (which maintains the invariant that if target was a descendant of current, it still will be).
