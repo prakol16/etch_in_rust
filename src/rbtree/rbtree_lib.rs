@@ -230,15 +230,15 @@ impl<K: Ord, V> NodePtr<K, V> {
         }
 
         // let `target` be the least node not satisfying `cmp_fn` (the one we want to return)
-        // Let `ancestor` be the least ancestor of `candidate` greater than it.We maintain the following loop invariants:
+        // Let `ancestor` be the least ancestor of `candidate` greater than it.
         // We maintain the following loop invariants:
-        // 1. Then, if target < ancestor, either target = candidate or target is a descendant of current
+        // 1. If target < ancestor, either target = candidate or target is a descendant of current
         // 2. current < ancestor
         // Note that these invariants always hold if current = candidate.right() and target > candidate
         let mut candidate = self;
         let mut current = self.right();
         // In principle, this loop should be `while !candidate.is_null() && cmp_fn(unsafe { &(*candidate.0).key })` (i.e., target > candidate).
-        // However, for efficiency, we instead present this as a loop with explicit breaks when the condition is false
+        // However, for efficiency, we instead write this as a loop with explicit breaks when the condition is false
         // (We've also explicitly checked the condition at the beginning of the function)
         loop {
             // For optimization, tell the compiler that the loop condition holds explicitly
@@ -255,29 +255,30 @@ impl<K: Ord, V> NodePtr<K, V> {
                     // Case 1a: target <= parent
                     // The loop invariant says if target < parent, target is a descendant of current.
                     // Thus, either target = parent or target is a descendant of current.
-                    // Also, (2) clearly continues to hold since ancestor can only increase
-                    // Thus, the loop invariants continue to hold with candidate := parent (and the loop ends)
+                    // Also, (2) clearly continues to hold since ancestor can only increase.
+                    // Thus, the loop invariants continue to hold with candidate := parent (and the loop ends).
                     break;
                 } else {
                     // Case 1b: target > parent
                     // In this case, assign current = parent.right() and continue the loop.
-                    // The invariants hold because target > parent (just like in initialization)
+                    // The invariants hold because target > parent (just like in initialization).
                     current = candidate.right();
                 }
             } else {
                 // Case 2: candidate is a right child
                 // In this case, ancestor does not change when candidate := parent since parent < candidate
-                // so the invariant continues to hold with candidate := parent
+                // so the invariant continues to hold with candidate := parent. Similarly, we don't
+                // need to check the loop condition to see if we should break since target > parent > candidate.
                 // This entire case could be a no-op. For optimization purposes, however, we do one step
                 // of a binary search for target from current
-                // (which maintains the invariant that if target was a descendant of current, it still will be)
+                // (which maintains the invariant that if target was a descendant of current, it still will be).
                 if !current.is_null() {
                     if cmp_fn(unsafe { &(*current.0).key }) {
                         current = current.right();
                     } else {
                         // If we find target <= current, then since current < ancestor
                         // we know target is a descendant of current.
-                        // Thus we can end the loop early (you can check that the invariants still hold)
+                        // Thus we can end the loop early (you can check that the invariants still hold).
                         candidate = current;
                         current = current.left();
                         break;
@@ -287,7 +288,7 @@ impl<K: Ord, V> NodePtr<K, V> {
         }
 
         // At the end of the loop, we must have target <= candidate. Thus, target < ancestor, 
-        // so either target = candidate or target is a descendant of current. We do a binary search from current for target
+        // so either target = candidate or target is a descendant of current. We do a binary search from current for target.
         while !current.is_null() {
             if cmp_fn(unsafe { &(*current.0).key }) {
                 current = current.right();
