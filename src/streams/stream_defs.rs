@@ -276,54 +276,6 @@ impl<S, F, O> IndexedStream for MappedStream<S, F, O>
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct ClonedStream<S> 
-where
-    S: IndexedStream
-{
-    stream: S,
-}
-
-impl<S> ClonedStream<S>
-where
-    S: IndexedStream
-{
-    pub fn new(stream: S) -> Self {
-        ClonedStream { stream }
-    }
-}
-
-impl<'a, V, S> IndexedStream for ClonedStream<S>
-where
-    S: IndexedStream<V = &'a V>,
-    V: Clone + 'a,
-{
-    type I = S::I;
-    type V = V;
-
-    fn current(&self) -> StreamResult<Self::I, Self::V> {
-        match self.stream.current() {
-            StreamResult::Done => StreamResult::Done,
-            StreamResult::Yield { index, value } => StreamResult::Yield { index, value: value.cloned() }
-        }
-    }
-
-    fn seek(&mut self, index: impl Borrow<Self::I>, strict: bool) {
-        self.stream.seek(index, strict);
-    }
-
-    fn next(&mut self, index: impl Borrow<Self::I>, strict: bool) {
-        self.stream.next(index, strict);
-    }
-
-    fn try_fold<B, F, R>(&mut self, init: B, mut f: F) -> ControlFlow<R, B>
-    where
-        F: FnMut(B, Self::I, Self::V) -> ControlFlow<R, B>
-    {
-        self.stream.try_fold(init, |acc, i, v| f(acc, i, v.clone()))
-    }
-}
-
 /// A stream iterator that produces a dense stream of values at every index
 /// filling in values with a default zero value if now value is provided
 pub struct DenseStreamIterator<S> {
