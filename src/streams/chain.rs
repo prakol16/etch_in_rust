@@ -1,4 +1,4 @@
-use std::ops::ControlFlow;
+use std::{borrow::Borrow, ops::ControlFlow};
 
 use replace_with::{replace_with_or_abort, replace_with_or_abort_and_return};
 
@@ -44,7 +44,7 @@ where
     type I = I;
     type V = V;
     
-    fn seek(&mut self, index: Self::I, strict: bool) {
+    fn seek(&mut self, index: impl Borrow<Self::I>, strict: bool) {
         replace_with_or_abort(self, |self_| {
             match self_ {
                 ChainStream::First { stream: mut a, f } => {
@@ -67,7 +67,7 @@ where
         });
     }
     
-    fn next(&mut self, index: Self::I, strict: bool) {
+    fn next(&mut self, index: impl Borrow<Self::I>, strict: bool) {
         replace_with_or_abort(self, |self_| {
             match self_ {
                 ChainStream::First { stream: mut a, f } => {
@@ -150,7 +150,7 @@ where
     type I = A::I;
     type V = A::V;
     
-    fn seek(&mut self, index: Self::I, strict: bool) {
+    fn seek(&mut self, index: impl Borrow<Self::I>, strict: bool) {
         if self.first.valid() {
             let old_index = self.first.index();
             self.first.seek(index, strict);
@@ -160,7 +160,7 @@ where
         }
     }
 
-    fn next(&mut self, index: Self::I, strict: bool) {
+    fn next(&mut self, index: impl Borrow<Self::I>, strict: bool) {
         if self.first.valid() {
             let old_index = self.first.index();
             self.first.next(index, strict);
@@ -242,15 +242,15 @@ mod chain_test {
             SortedVecGalloper::new(&[1, 2, 3, 4, 5]),
             |_| SortedVecGalloper::new(&[6, 7, 8, 9, 10]),
         );
-        stream.seek(&3, false);
+        stream.seek(&&3, false);
         assert_eq!(stream.current(), StreamResult::Yield { index: &3, value: Some(()) });
-        stream.seek(&3, true);
+        stream.seek(&&3, true);
         assert_eq!(stream.current(), StreamResult::Yield { index: &4, value: Some(()) });
-        stream.seek(&5, true);
+        stream.seek(&&5, true);
         assert_eq!(stream.current(), StreamResult::Yield { index: &6, value: Some(()) });
-        stream.seek(&6, false);
+        stream.seek(&&6, false);
         assert_eq!(stream.current(), StreamResult::Yield { index: &6, value: Some(()) });
-        stream.seek(&4, false);
+        stream.seek(&&4, false);
         assert_eq!(stream.current(), StreamResult::Yield { index: &6, value: Some(()) });
     }
 }

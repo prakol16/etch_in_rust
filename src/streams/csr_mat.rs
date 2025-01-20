@@ -1,3 +1,5 @@
+use std::borrow::Borrow;
+
 use super::{sparse_vec::SparseVecGalloper, stream_defs::{FromStreamIterator, IndexedStream, IntoStreamIterator, StreamResult}};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -67,15 +69,15 @@ impl<'a, T> IndexedStream for SparseCSRMatIterator<'a, T> {
     type I = usize;
     type V = SparseVecGalloper<'a, usize, T>;
 
-    fn seek(&mut self, index: Self::I, strict: bool) {
-        self.cur = if strict && index == self.cur {
-            index + 1
+    fn seek(&mut self, index: impl Borrow<Self::I>, strict: bool) {
+        self.cur = if strict && *index.borrow() == self.cur {
+            *index.borrow() + 1
         } else {
-            std::cmp::min(std::cmp::max(self.cur, index), self.rows.len() - 1)
+            std::cmp::min(std::cmp::max(self.cur, *index.borrow()), self.rows.len() - 1)
         }
     }
 
-    fn next(&mut self, _index: Self::I, _strict: bool) {
+    fn next(&mut self, _index: impl Borrow<Self::I>, _strict: bool) {
         self.cur += 1;
     }
 

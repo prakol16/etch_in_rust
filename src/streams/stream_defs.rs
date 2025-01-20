@@ -1,4 +1,4 @@
-use std::{convert::Infallible, marker::PhantomData, ops::{AddAssign, ControlFlow}};
+use std::{borrow::Borrow, convert::Infallible, marker::PhantomData, ops::{AddAssign, ControlFlow}};
 
 use num_traits::Zero;
 
@@ -35,14 +35,14 @@ pub trait IndexedStream {
     /// Will only be called when `valid` is true
     /// RULE (for termination): whenever (index, strict) >= (self.index(), self.ready()),
     /// (in the lexicographic order with false < true), then progress is made
-    fn seek(&mut self, index: Self::I, strict: bool);
+    fn seek(&mut self, index: impl Borrow<Self::I>, strict: bool);
 
     /// Like `seek`, but guarantees that current() == Yield(index, value),
     /// where value.is_some() iff strict is true.
     /// Should be equivalent to calling seek with those parameters.
     /// Some stream implementations may choose to override this with a more efficient implementation.
     #[inline]
-    fn next(&mut self, index: Self::I, strict: bool) {
+    fn next(&mut self, index: impl Borrow<Self::I>, strict: bool) {
         self.seek(index, strict);
     }
 
@@ -260,11 +260,11 @@ impl<S, F, O> IndexedStream for MappedStream<S, F, O>
         }
     }
 
-    fn seek(&mut self, index: Self::I, strict: bool) {
+    fn seek(&mut self, index: impl Borrow<Self::I>, strict: bool) {
         self.stream.seek(index, strict);
     }
 
-    fn next(&mut self, index: Self::I, strict: bool) {
+    fn next(&mut self, index: impl Borrow<Self::I>, strict: bool) {
         self.stream.next(index, strict);
     }
 
@@ -306,11 +306,11 @@ where
         }
     }
 
-    fn seek(&mut self, index: Self::I, strict: bool) {
+    fn seek(&mut self, index: impl Borrow<Self::I>, strict: bool) {
         self.stream.seek(index, strict);
     }
 
-    fn next(&mut self, index: Self::I, strict: bool) {
+    fn next(&mut self, index: impl Borrow<Self::I>, strict: bool) {
         self.stream.next(index, strict);
     }
 

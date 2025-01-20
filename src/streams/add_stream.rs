@@ -1,3 +1,5 @@
+use std::borrow::Borrow;
+
 use super::stream_defs::{IndexedStream, IntoStreamIterator, StreamResult};
 
 // impl<I, L, R> IndexedStream for AddStream<L, R> 
@@ -91,9 +93,9 @@ impl<I, V, L, R, F> IndexedStream for IntersectingUnionStream<L, R, F>
     type I = I;
     type V = V;
 
-    fn seek(&mut self, index: I, strict: bool) {
-        self.left.seek(index, strict);
-        self.right.seek(index, strict);
+    fn seek(&mut self, index: impl Borrow<I>, strict: bool) {
+        self.left.seek(index.borrow(), strict);
+        self.right.seek(index.borrow(), strict);
     }
 
     fn current(&self) -> StreamResult<Self::I, Self::V> {
