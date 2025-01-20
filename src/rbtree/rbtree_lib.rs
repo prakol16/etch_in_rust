@@ -78,6 +78,10 @@ impl<K: Ord, V> PartialOrd for NodePtr<K, V> {
 }
 
 impl<K: Ord, V> PartialEq for NodePtr<K, V> {
+/*************  ✨ Codeium Command ⭐  *************/
+    /// Compares two NodePtrs for equality by comparing the raw pointers.
+    /// Only true if the two NodePtrs point to the same memory location.
+/******  78078c97-330a-4a0a-a3c8-1f3aec374c49  *******/
     fn eq(&self, other: &NodePtr<K, V>) -> bool {
         self.0 == other.0
     }
@@ -315,7 +319,7 @@ impl<K: Ord + Clone, V: Clone> NodePtr<K, V> {
 
 /// # Examples
 /// ```rust
-/// use rbtree::RBTree;
+/// use etch::rbtree::rbtree_lib::RBTree;
 /// // type inference lets us omit an explicit type signature (which
 /// // would be `RBTree<&str, &str>` in this example).
 /// let mut book_reviews = RBTree::new();
@@ -356,7 +360,7 @@ impl<K: Ord + Clone, V: Clone> NodePtr<K, V> {
 ///
 /// // A `RBTree` with fixed list of elements can be initialized from an array:
 ///  ```
-/// use rbtree::RBTree;
+/// use etch::rbtree::rbtree_lib::RBTree;
 ///  let timber_resources: RBTree<&str, i32> =
 ///  [("Norway", 100),
 ///   ("Denmark", 50),
@@ -497,7 +501,7 @@ impl<K: Ord, V> Extend<(K, V)> for RBTree<K, V> {
 /// provide the rbtree all keys
 /// # Examples
 /// ```
-/// use rbtree::RBTree;
+/// use etch::rbtree::rbtree_lib::RBTree;
 /// let mut m = RBTree::new();
 /// for i in 1..6 {
 ///     m.insert(i, i);
@@ -541,7 +545,7 @@ impl<'a, K: Ord, V> Iterator for Keys<'a, K, V> {
 /// provide the rbtree all values order by key
 /// # Examples
 /// ```
-/// use rbtree::RBTree;
+/// use etch::rbtree::rbtree_lib::RBTree;
 /// let mut m = RBTree::new();
 /// m.insert(2, 5);
 /// m.insert(1, 6);
@@ -586,7 +590,7 @@ impl<'a, K: Ord, V> Iterator for Values<'a, K, V> {
 /// provide the rbtree all values and it can be modify
 /// # Examples
 /// ```
-/// use rbtree::RBTree;
+/// use etch::rbtree::rbtree_lib::RBTree;
 /// let mut m = RBTree::new();
 /// for i in 0..32 {
 ///     m.insert(i, i);
@@ -698,7 +702,7 @@ impl<K: Ord, V> DoubleEndedIterator for IntoIter<K, V> {
 /// provide iter ref for RBTree
 /// # Examples
 /// ```
-/// use rbtree::RBTree;
+/// use etch::rbtree::rbtree_lib::RBTree;
 /// let mut m = RBTree::new();
 /// for i in 0..32 {
 ///     m.insert(i, i * 2);
@@ -829,7 +833,7 @@ where
 /// provide iter mut ref for RBTree
 /// # Examples
 /// ```
-/// use rbtree::RBTree;
+/// use etch::rbtree::rbtree_lib::RBTree;
 /// let mut m = RBTree::new();
 /// for i in 0..32 {
 ///     m.insert(i, i);
@@ -1020,7 +1024,7 @@ impl<K: Ord, V> RBTree<K, V> {
     /// replace value if key exist, if not exist insert it.
     /// # Examples
     /// ```
-    /// use rbtree::RBTree;
+    /// use etch::rbtree::rbtree_lib::RBTree;
     /// let mut m = RBTree::new();
     /// assert_eq!(m.len(), 0);
     /// m.insert(2, 4);
@@ -1288,7 +1292,7 @@ impl<K: Ord, V> RBTree<K, V> {
     /// clear all red back tree elements.
     /// # Examples
     /// ```
-    /// use rbtree::RBTree;
+    /// use etch::rbtree::rbtree_lib::RBTree;
     /// let mut m = RBTree::new();
     /// for i in 0..6 {
     ///     m.insert(i, i);
