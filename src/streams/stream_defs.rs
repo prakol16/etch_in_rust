@@ -321,3 +321,48 @@ where
         self.stream.try_fold(init, |acc, i, v| f(acc, i, v.clone()))
     }
 }
+
+/// A stream iterator that produces a dense stream of values at every index
+/// filling in values with a default zero value if now value is provided
+pub struct DenseStreamIterator<S> {
+    index: usize,
+    stream: S
+}
+
+impl<S> DenseStreamIterator<S> {
+    pub fn from_stream_iterator(stream: S) -> Self {
+        DenseStreamIterator { index: 0, stream }
+    }
+}
+
+impl<S> Iterator for DenseStreamIterator<S>
+    where S: IndexedStream<I = usize>,
+          S::V: Zero
+{
+    type Item = S::V;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            match self.stream.current() {
+                StreamResult::Done => return None,
+                StreamResult::Yield { index, value } => {
+                    if self.index < index {
+                        self.index += 1;
+                        return Some(S::V::zero());
+                    } else {
+                        match value {
+                            Some(v) => {
+                                self.stream.next(index, true);
+                                self.index += 1;
+                                return Some(v);
+                            },
+                            None => {
+                                self.stream.seek(index, false);
+                            }
+                        }
+                    }
+                },
+            }
+        }
+    }    
+}
