@@ -1,4 +1,4 @@
-use std::{borrow::Borrow, convert::Infallible, marker::PhantomData, ops::{AddAssign, ControlFlow}};
+use std::{convert::Infallible, marker::PhantomData, ops::{AddAssign, ControlFlow}};
 
 use num_traits::Zero;
 
@@ -35,14 +35,14 @@ pub trait IndexedStream {
     /// Will only be called when `valid` is true
     /// RULE (for termination): whenever (index, strict) >= (self.index(), self.ready()),
     /// (in the lexicographic order with false < true), then progress is made
-    fn seek(&mut self, index: impl Borrow<Self::I>, strict: bool);
+    fn seek(&mut self, index: Self::I, strict: bool);
 
     /// Like `seek`, but guarantees that current() == Yield(index, value),
     /// where value.is_some() iff strict is true.
     /// Should be equivalent to calling seek with those parameters.
     /// Some stream implementations may choose to override this with a more efficient implementation.
     #[inline]
-    fn next(&mut self, index: impl Borrow<Self::I>, strict: bool) {
+    fn next(&mut self, index: Self::I, strict: bool) {
         self.seek(index, strict);
     }
 
@@ -148,8 +148,8 @@ pub trait IndexedStream {
         MappedStream::map(self, map)
     }
 
-    fn imap<O, F: Fn(Self::I) -> O, P: Borrow<Self::I>,
-               G: Fn(Self::I, &O) -> P>(self, map: F, unmap: G) -> IMappedStream<Self, F, G, O>
+    fn imap<O, F: Fn(Self::I) -> O,
+               G: Fn(Self::I, O) -> Self::I>(self, map: F, unmap: G) -> IMappedStream<Self, F, G, O>
     where
         Self: Sized
     {
@@ -278,11 +278,11 @@ impl<S, F, O> IndexedStream for MappedStream<S, F, O>
         }
     }
 
-    fn seek(&mut self, index: impl Borrow<Self::I>, strict: bool) {
+    fn seek(&mut self, index: Self::I, strict: bool) {
         self.stream.seek(index, strict);
     }
 
-    fn next(&mut self, index: impl Borrow<Self::I>, strict: bool) {
+    fn next(&mut self, index: Self::I, strict: bool) {
         self.stream.next(index, strict);
     }
 
@@ -300,11 +300,10 @@ pub struct IMappedStream<S, F, G, O> {
     _output: PhantomData<O>
 }
 
-impl<S, F, G, O, P> IMappedStream<S, F, G, O>
+impl<S, F, G, O> IMappedStream<S, F, G, O>
         where S: IndexedStream,
         F: Fn(S::I) -> O,
-        G: Fn(S::I, &O) -> P,
-        P: Borrow<S::I> {
+        G: Fn(S::I, O) -> S::I {
     pub fn imap(stream: S, map: F, unmap: G) -> Self {
         IMappedStream { stream, map, unmap, _output: PhantomData }
     }
@@ -313,9 +312,8 @@ impl<S, F, G, O, P> IMappedStream<S, F, G, O>
 impl<S, F, G, O, P> IndexedStream for IMappedStream<S, F, G, P>
     where S: IndexedStream,
           F: Fn(S::I) -> O,
-          G: Fn(S::I, &O) -> P,
-          O: Copy,
-          P: Borrow<S::I> {
+          G: Fn(S::I, O) -> S::I,
+          O: Copy {
     type I = O;
     type V = S::V;
 
@@ -326,20 +324,20 @@ impl<S, F, G, O, P> IndexedStream for IMappedStream<S, F, G, P>
         }
     }
     
-    fn seek(&mut self, new_index: impl Borrow<Self::I>, strict: bool) {
+    fn seek(&mut self, new_index: Self::I, strict: bool) {
         match self.stream.current() {
             StreamResult::Done => panic!("seek() should only be called when stream is valid"),
             StreamResult::Yield { index, .. } => {
-                self.stream.seek((self.unmap)(index, new_index.borrow()), strict);
+                self.stream.seek((self.unmap)(index, new_index), strict);
             },
         }
     }
 
-    fn next(&mut self, new_index: impl Borrow<Self::I>, strict: bool) {
+    fn next(&mut self, new_index: Self::I, strict: bool) {
         match self.stream.current() {
             StreamResult::Done => panic!("next() should only be called when stream is valid"),
             StreamResult::Yield { index, .. } => {
-                self.stream.next((self.unmap)(index, new_index.borrow()), strict);
+                self.stream.next((self.unmap)(index, new_index), strict);
             },
         }
     }

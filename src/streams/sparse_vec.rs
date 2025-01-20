@@ -1,5 +1,3 @@
-use std::borrow::Borrow;
-
 use num_traits::Zero;
 
 use super::{binary_search::binary_search, stream_defs::{FromStreamIterator, IndexedStream, IntoStreamIterator, StreamResult}};
@@ -110,11 +108,11 @@ impl<'a, I: Ord, T> IndexedStream for SparseVecGalloper<'a, I, T> {
     type I = &'a I;
     type V = &'a T;
 
-    fn seek(&mut self, index: impl Borrow<Self::I>, strict: bool) {
-        self.cur += binary_search(&self.inds[self.cur..], index.borrow(), strict);
+    fn seek(&mut self, index: Self::I, strict: bool) {
+        self.cur += binary_search(&self.inds[self.cur..], index, strict);
     }
 
-    fn next(&mut self, _index: impl Borrow<Self::I>, _strict: bool) {
+    fn next(&mut self, _index: Self::I, _strict: bool) {
         self.cur += 1;
     }
 
@@ -135,14 +133,13 @@ impl<'a, I: Ord, T> IndexedStream for SparseVecIterator<'a, I, T> {
     type V = &'a T;
 
 
-    fn seek(&mut self, index: impl Borrow<Self::I>, strict: bool) {
-        if (strict && self.inds[self.cur] <= **index.borrow())
-            || (!strict && self.inds[self.cur] < **index.borrow()) {
+    fn seek(&mut self, index: Self::I, strict: bool) {
+        if (strict && self.inds[self.cur] <= *index) || (!strict && self.inds[self.cur] < *index) {
             self.cur += 1;
         }
     }
 
-    fn next(&mut self, _index: impl Borrow<Self::I>, _strict: bool) {
+    fn next(&mut self, _index: Self::I, _strict: bool) {
         self.cur += 1;
     }
 

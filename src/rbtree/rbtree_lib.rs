@@ -7,7 +7,6 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use std::borrow::Borrow;
 use std::cmp::Ord;
 use std::cmp::Ordering;
 use std::fmt::{self, Debug};
@@ -868,17 +867,17 @@ where
         }
     }
 
-    fn next(&mut self, _index: impl Borrow<&'a K>, _strict: bool) {
+    fn next(&mut self, _index: &K, _strict: bool) {
         assert!(self.valid());
         self.head = self.head.next();
     }
 
-    fn seek(&mut self, k: impl Borrow<&'a K>, strict: bool) {
+    fn seek(&mut self, k: &K, strict: bool) {
         assert!(self.valid());
         if strict {
-            self.head = self.head.seek(|k2| k2 <= k.borrow());
+            self.head = self.head.seek(|k2| k2 <= k);
         } else {
-            self.head = self.head.seek(|k2| k2 < k.borrow());
+            self.head = self.head.seek(|k2| k2 < k);
         }
     }
 }
