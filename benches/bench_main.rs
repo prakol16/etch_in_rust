@@ -15,7 +15,7 @@ fn gen_random_sorted_strings(n: usize, sparsity: usize, seed: u64) -> Vec<String
 }
 
 fn gen_random_sorted_ints(n: usize, sparsity: u32, seed: u64) -> Vec<u32> {
-    let mut rng = StdRng::seed_from_u64(seed);
+    let mut rng = StdRng::seed_from_u64(420 + seed);
     let mut numbers: Vec<u32> = (0..sparsity*n as u32).collect();
     numbers.shuffle(&mut rng);
     numbers.truncate(n);
