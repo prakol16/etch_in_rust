@@ -148,6 +148,14 @@ pub trait IndexedStream {
         MappedStream::map(self, map)
     }
 
+    fn imap<O, F: Fn(Self::I) -> O, P: Borrow<Self::I>,
+               G: Fn(Self::I, &O) -> P>(self, map: F, unmap: G) -> IMappedStream<Self, F, G, O>
+    where
+        Self: Sized
+    {
+        IMappedStream::imap(self, map, unmap)
+    }
+
     fn cloned<'a, V>(self) -> impl IndexedStream<I = Self::I, V = V>
     where
         Self: Sized + IndexedStream<V = &'a V>,
@@ -155,6 +163,14 @@ pub trait IndexedStream {
     {
         self.map(|_i, v| v.clone())
     }
+
+    // fn icloned<'a, I>(self) -> impl IndexedStream<I = I, V = Self::V>
+    // where
+    //     Self: Sized + IndexedStream<I = &'a I>,
+    //     I: Copy + 'a
+    // {
+    //     self.imap(|i| *i, |_, i| i)
+    // }
 
     fn zip_with<R: IndexedStream<I = Self::I>, O, F: Fn(Self::V, R::V) -> O>(self, right: R, f: F) -> ZipStream<Self, R, F>
     where
@@ -273,6 +289,64 @@ impl<S, F, O> IndexedStream for MappedStream<S, F, O>
     fn try_fold<B, FF, R>(&mut self, init: B, mut f: FF) -> ControlFlow<R, B> where
             FF: FnMut(B, Self::I, Self::V) -> ControlFlow<R, B> {
         self.stream.try_fold(init, |acc, i, v| f(acc, i, (self.map)(i, v)))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct IMappedStream<S, F, G, O> {
+    stream: S,
+    map: F,
+    unmap: G,
+    _output: PhantomData<O>
+}
+
+impl<S, F, G, O, P> IMappedStream<S, F, G, O>
+        where S: IndexedStream,
+        F: Fn(S::I) -> O,
+        G: Fn(S::I, &O) -> P,
+        P: Borrow<S::I> {
+    pub fn imap(stream: S, map: F, unmap: G) -> Self {
+        IMappedStream { stream, map, unmap, _output: PhantomData }
+    }
+}
+
+impl<S, F, G, O, P> IndexedStream for IMappedStream<S, F, G, P>
+    where S: IndexedStream,
+          F: Fn(S::I) -> O,
+          G: Fn(S::I, &O) -> P,
+          O: Copy,
+          P: Borrow<S::I> {
+    type I = O;
+    type V = S::V;
+
+    fn current(&self) -> StreamResult<Self::I, Self::V> {
+        match self.stream.current() {
+            StreamResult::Done => StreamResult::Done,
+            StreamResult::Yield { index, value } => StreamResult::Yield { index: (self.map)(index), value }
+        }
+    }
+    
+    fn seek(&mut self, new_index: impl Borrow<Self::I>, strict: bool) {
+        match self.stream.current() {
+            StreamResult::Done => panic!("seek() should only be called when stream is valid"),
+            StreamResult::Yield { index, .. } => {
+                self.stream.seek((self.unmap)(index, new_index.borrow()), strict);
+            },
+        }
+    }
+
+    fn next(&mut self, new_index: impl Borrow<Self::I>, strict: bool) {
+        match self.stream.current() {
+            StreamResult::Done => panic!("next() should only be called when stream is valid"),
+            StreamResult::Yield { index, .. } => {
+                self.stream.next((self.unmap)(index, new_index.borrow()), strict);
+            },
+        }
+    }
+
+    fn try_fold<B, H, R>(&mut self, init: B, mut f: H) -> ControlFlow<R, B> where
+            H: FnMut(B, Self::I, Self::V) -> ControlFlow<R, B> {
+        self.stream.try_fold(init, |acc, i, v| f(acc, (self.map)(i), v))
     }
 }
 
