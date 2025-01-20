@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use etch::{examples::{sorted_vec_intersect::{vec_intersect_manual, vec_intersect_streams_gallop, vec_intersect_streams_linear}, tree_iteration::{intersect2_iterators, intersect2_manual, intersect3_iterators, itersect3_manual}, triangle_query::{create_skewed_relation, triangle_query_fused}}, streams::{sorted_vec::SortedVecGalloper, stream_defs::IndexedStream}};
+use etch::{examples::{sorted_vec_intersect::{vec_intersect_manual, vec_intersect_streams_gallop, vec_intersect_streams_linear}, tree_iteration::{intersect2_iterators, intersect2_manual, intersect3_iterators, itersect3_manual}, triangle_query::{create_skewed_relation, triangle_query_fused, triangle_query_naive}}, streams::{sorted_vec::SortedVecGalloper, stream_defs::IndexedStream}};
 use rand::{prelude::SliceRandom, rngs::StdRng, SeedableRng};
 
 fn gen_random_sorted_strings(n: usize, sparsity: usize, seed: u64) -> Vec<String> {
@@ -44,13 +44,13 @@ fn triangle_query_benchmark(c: &mut Criterion) {
             r2.stream_iter().map(|_, x| SortedVecGalloper::new(x)),
             r3.stream_iter().map(|_, x| SortedVecGalloper::new(x))
         ))));
-    group.bench_function("tri.unfused", |b| {
-        b.iter(|| black_box(triangle_query_unfused(
-            r1.stream_iter().map(|_, x| SortedVecGalloper::new(x)),
-            r2.stream_iter().map(|_, x| SortedVecGalloper::new(x)),
-            r3.stream_iter().map(|_, x| SortedVecGalloper::new(x))
-        )));
-    });
+    // group.bench_function("tri.unfused", |b| {
+    //     b.iter(|| black_box(triangle_query_unfused(
+    //         r1.stream_iter().map(|_, x| SortedVecGalloper::new(x)),
+    //         r2.stream_iter().map(|_, x| SortedVecGalloper::new(x)),
+    //         r3.stream_iter().map(|_, x| SortedVecGalloper::new(x))
+    //     )));
+    // });
     group.bench_function("tri.naive", |b| {
         b.iter(|| black_box(triangle_query_naive(
             &r1,
