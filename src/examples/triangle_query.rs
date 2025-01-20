@@ -23,7 +23,7 @@ fn join_2<A: Ord + Copy, B: Ord + Copy, C: Ord + Copy>(
 pub fn create_all_pairs_table<'a, A: Ord + Copy, B: Ord + Copy>(
     s1: &'a [A],
     s2: &'a [B],
-) -> indexed_stream!(&'a A, &'a B, (); Clone, 'a){
+) -> indexed_stream!(A, B, (); Clone, 'a) {
     SortedVecGalloper::new(s1).map(|_, _| SortedVecGalloper::new(s2))
 }
 
@@ -110,7 +110,7 @@ pub fn triangle_query_fused<A: Ord + Copy, B: Ord + Copy, C: Ord + Copy>(
 
     result
         .map(|_, a| {
-            a.map(|_, b| b.collect_indices_ref())
+            a.map(|_, b| b.collect_indices())
                 .collect::<SparseVec<B, Vec<C>>>()
         })
         .collect()

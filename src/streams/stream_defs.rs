@@ -103,22 +103,10 @@ pub trait IndexedStream {
         self.fold(Self::V::zero(), |acc, _, v| acc + v)
     }
 
-    /// Collect the indices of this iterator as a Vec
-    /// TODO: turn this into an iterator
-    fn collect_indices<'a, I>(self) -> Vec<I>
-    where
-        Self: Sized + IndexedStream<I = &'a I>,
-        I: 'a + Clone
-    {
-        let mut indices = Vec::new();
-        self.for_each(|i, _| indices.push(i.clone()));
-        indices
-    }
-
     
     /// Collect the indices of this iterator as a Vec of (copied) indices
     /// TODO: turn this into an iterator
-    fn collect_indices_ref(self) -> Vec<Self::I>
+    fn collect_indices(self) -> Vec<Self::I>
     where
         Self: Sized
     {

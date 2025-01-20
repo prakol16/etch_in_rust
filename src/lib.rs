@@ -26,7 +26,7 @@ mod test {
         let prod = v1.stream_iter_linear().cloned().zip_with(v2.stream_iter().cloned(), mul);
         let mut result = Vec::with_capacity(v1.len().min(v2.len()));
         result.extend_from_stream_iterator(prod);
-        assert_eq!(result, vec![(&1, 28), (&33, 27)]);
+        assert_eq!(result, vec![(1, 28), (33, 27)]);
     }
 
     #[test]
@@ -37,7 +37,7 @@ mod test {
         let prod2 = v1.stream_iter_linear().cloned().zip_with(v2.stream_iter_linear().cloned(), mul).zip_with(v3.stream_iter_linear().cloned(), mul);
         let mut result2 = Vec::with_capacity(v1.len().min(v2.len()).min(v3.len()));
         result2.extend_from_stream_iterator(prod2);
-        assert_eq!(result2, vec![(&1, -56)]);
+        assert_eq!(result2, vec![(1, -56)]);
     }
 
     #[test]
@@ -47,7 +47,7 @@ mod test {
         let prod3 = v4.stream_iter().cloned().zip_with(v1.stream_iter().cloned(), mul);
         let mut result3 = SparseVec::with_capacity(v4.len().min(v1.len()));
         result3.extend_from_stream_iterator(prod3);
-        assert_eq!(result3, SparseVec::from_iter([(&20, 10), (&33, 21)]));
+        assert_eq!(result3, SparseVec::from_iter([(20, 10), (33, 21)]));
     }
 
     #[test]
@@ -130,9 +130,9 @@ mod proptests {
         let vec_b = b.iter().map(|(k, v)| (*k, *v)).collect::<SparseVec<_, _>>();
         let zipped = vec_a.stream_iter()
             .zip_with(vec_b.stream_iter(), |a, b| (*a, *b));
-        let result: SparseVec<&u8, (usize, usize)> = zipped.collect();
+        let result: SparseVec<u8, (usize, usize)> = zipped.collect();
         let expected = intersect_maps(a, b);
-        assert_eq!(result, expected.iter().map(|(k, (v1, v2))| (k, (*v1, *v2))).collect());
+        assert_eq!(result, expected.iter().map(|(k, (v1, v2))| (*k, (*v1, *v2))).collect());
     }
 
     #[quickcheck]
@@ -232,7 +232,7 @@ mod proptests {
             crate::streams::add_stream::union(vec_a.stream_iter(), vec_b.stream_iter(),
             |x| x.map(|v| *v, |v| *v))
             .collect::<SparseVec<_, _>>()
-            .into_iter().map(|(k, v)| (*k, v)).collect::<SparseVec<_, _>>();
+            .into_iter().collect::<SparseVec<_, _>>();
         let expected = union_maps(&a, &b)
             .into_iter()
             .collect::<SparseVec<_, _>>();

@@ -104,12 +104,12 @@ impl<'a, I, T> SparseVecGalloper<'a, I, T> {
 // TODO: unify sorted_vec and sparse_vec by making them ordinary functions and reusing the functions
 // in the implementations
 
-impl<'a, I: Ord, T> IndexedStream for SparseVecGalloper<'a, I, T> {
-    type I = &'a I;
+impl<'a, I: Ord + Copy, T> IndexedStream for SparseVecGalloper<'a, I, T> {
+    type I = I;
     type V = &'a T;
 
     fn seek(&mut self, index: Self::I, strict: bool) {
-        self.cur += binary_search(&self.inds[self.cur..], index, strict);
+        self.cur += binary_search(&self.inds[self.cur..], &index, strict);
     }
 
     fn next(&mut self, _index: Self::I, _strict: bool) {
@@ -119,7 +119,7 @@ impl<'a, I: Ord, T> IndexedStream for SparseVecGalloper<'a, I, T> {
     fn current(&self) -> StreamResult<Self::I, Self::V> {
         if self.cur < self.inds.len() {
             StreamResult::Yield {
-                index: &self.inds[self.cur],
+                index: self.inds[self.cur],
                 value: Some(&self.vals[self.cur]),
             }
         } else {
@@ -128,13 +128,13 @@ impl<'a, I: Ord, T> IndexedStream for SparseVecGalloper<'a, I, T> {
     }
 }
 
-impl<'a, I: Ord, T> IndexedStream for SparseVecIterator<'a, I, T> {
-    type I = &'a I;
+impl<'a, I: Ord + Copy, T> IndexedStream for SparseVecIterator<'a, I, T> {
+    type I = I;
     type V = &'a T;
 
 
     fn seek(&mut self, index: Self::I, strict: bool) {
-        if (strict && self.inds[self.cur] <= *index) || (!strict && self.inds[self.cur] < *index) {
+        if (strict && self.inds[self.cur] <= index) || (!strict && self.inds[self.cur] < index) {
             self.cur += 1;
         }
     }
@@ -146,7 +146,7 @@ impl<'a, I: Ord, T> IndexedStream for SparseVecIterator<'a, I, T> {
     fn current(&self) -> StreamResult<Self::I, Self::V> {
         if self.cur < self.inds.len() {
             StreamResult::Yield {
-                index: &self.inds[self.cur],
+                index: self.inds[self.cur],
                 value: Some(&self.vals[self.cur]),
             }
         } else {
@@ -173,8 +173,8 @@ impl<I, T> SparseVec<I, T> {
     }
 }
 
-impl<'a, I: Ord, T> IntoStreamIterator for &'a SparseVec<I, T> {
-    type IndexType = &'a I;
+impl<'a, I: Ord + Copy, T> IntoStreamIterator for &'a SparseVec<I, T> {
+    type IndexType = I;
     type ValueType = &'a T;
     type StreamType = SparseVecGalloper<'a, I, T>;
 

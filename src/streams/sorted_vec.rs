@@ -24,12 +24,12 @@ impl<'a, T> SortedVecLinear<'a, T> {
     }
 }
 
-impl<'a, T: Ord> IndexedStream for SortedVecGalloper<'a, T> {
-    type I = &'a T;
+impl<'a, T: Ord + Copy> IndexedStream for SortedVecGalloper<'a, T> {
+    type I = T;
     type V = ();
 
     fn seek(&mut self, index: Self::I, strict: bool) {
-        self.cur += binary_search(&self.inds[self.cur..], index, strict);
+        self.cur += binary_search(&self.inds[self.cur..], &index, strict);
     }
 
     fn next(&mut self, _index: Self::I, _strict: bool) {
@@ -39,7 +39,7 @@ impl<'a, T: Ord> IndexedStream for SortedVecGalloper<'a, T> {
     fn current(&self) -> StreamResult<Self::I, Self::V> {
         if self.cur < self.inds.len() {
             StreamResult::Yield {
-                index: &self.inds[self.cur],
+                index: self.inds[self.cur],
                 value: Some(()),
             }
         } else {
@@ -48,12 +48,12 @@ impl<'a, T: Ord> IndexedStream for SortedVecGalloper<'a, T> {
     }
 }
 
-impl<'a, T: Ord> IndexedStream for SortedVecLinear<'a, T> {
-    type I = &'a T;
+impl<'a, T: Ord + Copy> IndexedStream for SortedVecLinear<'a, T> {
+    type I = T;
     type V = ();
 
     fn seek(&mut self, index: Self::I, strict: bool) {
-        if (strict && self.inds[self.cur] <= *index) || (!strict && self.inds[self.cur] < *index) {
+        if (strict && self.inds[self.cur] <= index) || (!strict && self.inds[self.cur] < index) {
             self.cur += 1;
         }
     }
@@ -65,7 +65,7 @@ impl<'a, T: Ord> IndexedStream for SortedVecLinear<'a, T> {
     fn current(&self) -> StreamResult<Self::I, Self::V> {
         if self.cur < self.inds.len() {
             StreamResult::Yield {
-                index: &self.inds[self.cur],
+                index: self.inds[self.cur],
                 value: Some(()),
             }
         } else {

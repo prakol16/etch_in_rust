@@ -152,16 +152,16 @@ mod chain_test {
             SortedVecGalloper::new(&[1, 2, 3, 4, 5]).chain(
             SortedVecGalloper::new(&[6, 7, 8, 9, 10])
         );
-        stream.seek(&3, false);
-        assert_eq!(stream.current(), StreamResult::Yield { index: &3, value: Some(()) });
-        stream.seek(&3, true);
-        assert_eq!(stream.current(), StreamResult::Yield { index: &4, value: Some(()) });
-        stream.seek(&5, true);
-        assert_eq!(stream.current(), StreamResult::Yield { index: &6, value: Some(()) });
-        stream.seek(&6, false);
-        assert_eq!(stream.current(), StreamResult::Yield { index: &6, value: Some(()) });
-        stream.seek(&4, false);
-        assert_eq!(stream.current(), StreamResult::Yield { index: &6, value: Some(()) });
+        stream.seek(3, false);
+        assert_eq!(stream.current(), StreamResult::Yield { index: 3, value: Some(()) });
+        stream.seek(3, true);
+        assert_eq!(stream.current(), StreamResult::Yield { index: 4, value: Some(()) });
+        stream.seek(5, true);
+        assert_eq!(stream.current(), StreamResult::Yield { index: 6, value: Some(()) });
+        stream.seek(6, false);
+        assert_eq!(stream.current(), StreamResult::Yield { index: 6, value: Some(()) });
+        stream.seek(4, false);
+        assert_eq!(stream.current(), StreamResult::Yield { index: 6, value: Some(()) });
     }
 
 
@@ -184,15 +184,15 @@ mod chain_test {
             SortedVecGalloper::new(&[1, 2, 3, 4, 5]),
             |_| SortedVecGalloper::new(&[6, 7, 8, 9, 10]),
         );
-        stream.seek(&3, false);
-        assert_eq!(stream.current(), StreamResult::Yield { index: &3, value: Some(()) });
-        stream.seek(&3, true);
-        assert_eq!(stream.current(), StreamResult::Yield { index: &4, value: Some(()) });
-        stream.seek(&5, true);
-        assert_eq!(stream.current(), StreamResult::Yield { index: &6, value: Some(()) });
-        stream.seek(&6, false);
-        assert_eq!(stream.current(), StreamResult::Yield { index: &6, value: Some(()) });
-        stream.seek(&4, false);
-        assert_eq!(stream.current(), StreamResult::Yield { index: &6, value: Some(()) });
+        stream.seek(3, false);
+        assert_eq!(stream.current(), StreamResult::Yield { index: 3, value: Some(()) });
+        stream.seek(3, true);
+        assert_eq!(stream.current(), StreamResult::Yield { index: 4, value: Some(()) });
+        stream.seek(5, true);
+        assert_eq!(stream.current(), StreamResult::Yield { index: 6, value: Some(()) });
+        stream.seek(6, false);
+        assert_eq!(stream.current(), StreamResult::Yield { index: 6, value: Some(()) });
+        stream.seek(4, false);
+        assert_eq!(stream.current(), StreamResult::Yield { index: 6, value: Some(()) });
     }
 }
