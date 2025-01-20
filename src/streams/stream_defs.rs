@@ -2,7 +2,7 @@ use std::{borrow::Borrow, convert::Infallible, marker::PhantomData, ops::{AddAss
 
 use num_traits::Zero;
 
-use super::{chain::{ChainStream, FixedChainStream}, zip_stream::ZipStream};
+use super::{chain::ChainStream, zip_stream::ZipStream};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StreamResult<I, V> {
@@ -148,12 +148,12 @@ pub trait IndexedStream {
         MappedStream::map(self, map)
     }
 
-    fn cloned<'a, V>(self) -> ClonedStream<Self>
+    fn cloned<'a, V>(self) -> impl IndexedStream<I = Self::I, V = V>
     where
         Self: Sized + IndexedStream<V = &'a V>,
         V: Clone + 'a
     {
-        ClonedStream::new(self)
+        self.map(|_i, v| v.clone())
     }
 
     fn zip_with<R: IndexedStream<I = Self::I>, O, F: Fn(Self::V, R::V) -> O>(self, right: R, f: F) -> ZipStream<Self, R, F>
@@ -179,12 +179,14 @@ pub trait IndexedStream {
         ChainStream::chain(self, second)
     }
 
-    fn chain<B>(self, second: B) -> FixedChainStream<Self, B>
+    fn chain<B>(self, second: B) -> impl IndexedStream<I = Self::I, V = Self::V>
     where
         Self: Sized,
+        Self::I: Ord,
         B: IndexedStream<I = Self::I, V = Self::V>,
     {
-        FixedChainStream::new(self, second)
+        // FixedChainStream::new(self, second)
+        self.and_then_chain(move |_| second)
     }
 }
 

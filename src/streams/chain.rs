@@ -129,74 +129,16 @@ where
     }
 }
 
-#[derive(Clone)]
-pub struct FixedChainStream<A, B> {
-    first: A,
-    second: B,
-}
-
-impl<A, B> FixedChainStream<A, B> {
-    pub fn new(first: A, second: B) -> Self {
-        FixedChainStream { first, second }
-    }
-}
-
-impl<A, B> IndexedStream for FixedChainStream<A, B>
-where
-    A: IndexedStream,
-    B: IndexedStream<I = A::I, V = A::V>,
-    A::I: Ord + Copy,
-{
-    type I = A::I;
-    type V = A::V;
-    
-    fn seek(&mut self, index: impl Borrow<Self::I>, strict: bool) {
-        if self.first.valid() {
-            let old_index = self.first.index();
-            self.first.seek(index, strict);
-            debug_assert!(self.first.valid() || !self.second.valid() || old_index.unwrap() <= self.second.index().unwrap());
-        } else {
-            self.second.seek(index, strict);
-        }
-    }
-
-    fn next(&mut self, index: impl Borrow<Self::I>, strict: bool) {
-        if self.first.valid() {
-            let old_index = self.first.index();
-            self.first.next(index, strict);
-            debug_assert!(self.first.valid() || !self.second.valid() || old_index.unwrap() <= self.second.index().unwrap());
-        } else {
-            self.second.next(index, strict);
-        }
-    }
-    
-    fn current(&self) -> StreamResult<Self::I, Self::V> {
-        match self.first.current() {
-            StreamResult::Done => self.second.current(),
-            StreamResult::Yield { index, value } => StreamResult::Yield { index, value }
-        }
-    }
-
-    fn try_fold<BB, F, R>(&mut self, init: BB, mut f: F) -> ControlFlow<R, BB> where
-            F: FnMut(BB, Self::I, Self::V) -> ControlFlow<R, BB> {
-        let acc = self.first.try_fold(init, &mut f)?;
-        self.second.try_fold(acc, &mut f)
-    }
-}
-
 #[cfg(test)]
 
 mod chain_test {
     use crate::streams::{chain::ChainStream, sorted_vec::SortedVecGalloper, stream_defs::{IndexedStream, StreamResult}};
 
-    use super::FixedChainStream;
-
-
     #[test]
     fn basic_chain_test() {
-        let stream = FixedChainStream::new(
-            SortedVecGalloper::new(&[1, 2, 3, 4, 5]),
-            SortedVecGalloper::new(&[6, 7, 8, 9, 10]),
+        let stream =
+            SortedVecGalloper::new(&[1, 2, 3, 4, 5]).chain(
+            SortedVecGalloper::new(&[6, 7, 8, 9, 10])
         );
         assert_eq!(
             stream.collect_indices(),
@@ -206,9 +148,9 @@ mod chain_test {
 
     #[test]
     fn chain_seek_test() {
-        let mut stream = FixedChainStream::new(
-            SortedVecGalloper::new(&[1, 2, 3, 4, 5]),
-            SortedVecGalloper::new(&[6, 7, 8, 9, 10]),
+        let mut stream = 
+            SortedVecGalloper::new(&[1, 2, 3, 4, 5]).chain(
+            SortedVecGalloper::new(&[6, 7, 8, 9, 10])
         );
         stream.seek(&3, false);
         assert_eq!(stream.current(), StreamResult::Yield { index: &3, value: Some(()) });
