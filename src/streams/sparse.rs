@@ -142,23 +142,23 @@ impl<'a, T> IndexedStream for DenseIndexIterator<'a, T>
 }
 
 #[derive(Debug, Clone)]
-struct SparseIndex<T> {
+struct SparseIndex<I, T> {
     boundaries: Vec<usize>,
     // Always size one less than that of `boundaries`
-    inds: Vec<usize>,
+    inds: Vec<I>,
     // The data associated with index at inds[i]
     // is data.slice(boundaries[i], boundaries[i+1] - boundaries[i])
     data: T,
 }
 
 #[derive(Debug)]
-struct SparseIndexView<'a, T: StackableView<'a>> {
+struct SparseIndexView<'a, I, T: StackableView<'a>> {
     boundaries: &'a [usize],
-    inds: &'a [usize],
+    inds: &'a [I],
     data: T::View
 }
 
-impl<'a, T: StackableView<'a>> Clone for SparseIndexView<'a, T>
+impl<'a, I, T: StackableView<'a>> Clone for SparseIndexView<'a, I, T>
         where T::View: Clone {
     fn clone(&self) -> Self {
         SparseIndexView {
@@ -169,7 +169,7 @@ impl<'a, T: StackableView<'a>> Clone for SparseIndexView<'a, T>
     }
 }
 
-impl<'a, T: StackableView<'a>> Sliceable for SparseIndexView<'a, T> {
+impl<'a, I, T: StackableView<'a>> Sliceable for SparseIndexView<'a, I, T> {
     type Elem = T::View;
 
     fn slice(self, start: usize, size: usize) -> Self {
@@ -181,13 +181,13 @@ impl<'a, T: StackableView<'a>> Sliceable for SparseIndexView<'a, T> {
     }
 
     fn get(&self, index: usize) -> Self::Elem {
-        self.data.clone().slice(self.boundaries[self.inds[index]], 
-            self.boundaries[self.inds[index] + 1] - self.boundaries[self.inds[index]])
+        self.data.clone().slice(self.boundaries[index],
+            self.boundaries[index + 1] - self.boundaries[index])
     }
 }
 
-impl<'a, T: StackableView<'a>> StackableView<'a> for SparseIndex<T> {
-    type View = SparseIndexView<'a, T>;
+impl<'a, I: 'a, T: StackableView<'a>> StackableView<'a> for SparseIndex<I, T> {
+    type View = SparseIndexView<'a, I, T>;
 
     fn to_view(&'a self) -> Self::View {
         SparseIndexView {
@@ -198,12 +198,12 @@ impl<'a, T: StackableView<'a>> StackableView<'a> for SparseIndex<T> {
     }
 }
 
-struct SparseIndexIterator<'a, T: StackableView<'a>> {
-    view: SparseIndexView<'a, T>,
+struct SparseIndexIterator<'a, I, T: StackableView<'a>> {
+    view: SparseIndexView<'a, I, T>,
     current_index: usize
 }
 
-impl<'a, T: StackableView<'a>> Clone for SparseIndexIterator<'a, T> {
+impl<'a, I: 'a,T: StackableView<'a>> Clone for SparseIndexIterator<'a, I, T> {
     fn clone(&self) -> Self {
         SparseIndexIterator {
             view: self.view.clone(),
@@ -212,17 +212,18 @@ impl<'a, T: StackableView<'a>> Clone for SparseIndexIterator<'a, T> {
     }
 }
 
-impl<'a, T> IndexedStream for SparseIndexIterator<'a, T>
+impl<'a, I, T> IndexedStream for SparseIndexIterator<'a, I, T>
         where T: StackableView<'a>,
-              T::View: IntoStreamIterator {
-    type I = usize;
+              T::View: IntoStreamIterator,
+              I: Copy + Ord {
+    type I = I;
 
     type V = <T::View as IntoStreamIterator>::StreamType;
 
     fn current(&self) -> super::stream_defs::StreamResult<Self::I, Self::V> {
         if self.current_index < self.view.inds.len() {
             StreamResult::Yield {
-                index: self.current_index,
+                index: self.view.inds[self.current_index],
                 value: Some(self.view.get(self.current_index).into_stream_iterator())
             }
         } else {
@@ -236,5 +237,14 @@ impl<'a, T> IndexedStream for SparseIndexIterator<'a, T>
 
     fn next(&mut self, _index: Self::I, _strict: bool) {
         self.current_index += 1;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SparseIndex;
+    use crate::streams::stream_defs::IntoStreamIterator;
+
+    fn test_basic() {
     }
 }
