@@ -5,5 +5,6 @@ pub mod add_stream;
 mod binary_search;
 pub mod sparse_vec;
 pub mod sorted_vec;
+pub mod sparse;
 pub mod csr_mat;
 pub mod macros;
