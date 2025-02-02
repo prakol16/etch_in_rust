@@ -11,6 +11,7 @@ mod test {
     use crate::streams::sparse_vec::SparseVec;
     
     use crate::streams::stream_defs::DenseStreamIterator;
+    use crate::streams::stream_defs::ExtendFromStreamIterator;
     use crate::streams::stream_defs::IntoStreamIterator;
     use crate::streams::stream_defs::FromStreamIterator;
     use crate::streams::stream_defs::IndexedStream;

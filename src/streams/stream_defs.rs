@@ -217,24 +217,27 @@ impl<S: IndexedStream> IntoStreamIterator for S {
     }
 }
 
-pub trait FromStreamIterator<I, V> {
-
-    fn from_stream_iterator<S: IndexedStream<I=I, V=V>>(iter: S) -> Self;
-
-    fn extend_from_stream_iterator<S: IndexedStream<I=I, V=V>>(&mut self, iter: S);
+pub trait ExtendFromStreamIterator<I, V> {
+    fn extend_from_stream_iterator(&mut self, iter: impl IndexedStream<I=I, V=V>);
 }
 
-impl<I, V> FromStreamIterator<I, V> for Vec<(I, V)> {
-    fn from_stream_iterator<Iter: IndexedStream<I=I, V=V>>(iter: Iter) -> Self {
-        let mut result = Vec::new();
-        result.extend_from_stream_iterator(iter);
-        result
-    }
+pub trait FromStreamIterator<I, V> {
+    fn from_stream_iterator(iter: impl IndexedStream<I=I, V=V>) -> Self;
+}
 
-    fn extend_from_stream_iterator<Iter: IndexedStream<I=I, V=V>>(&mut self, iter: Iter) {
+impl<I, V> ExtendFromStreamIterator<I, V> for Vec<(I, V)> {
+    fn extend_from_stream_iterator(&mut self, iter: impl IndexedStream<I=I, V=V>) {
         iter.for_each(|i, v| {
             self.push((i, v));
         });
+    }
+}
+
+impl<I, V> FromStreamIterator<I, V> for Vec<(I, V)> {
+    fn from_stream_iterator(iter: impl IndexedStream<I=I, V=V>) -> Self {
+        let mut result = Vec::new();
+        result.extend_from_stream_iterator(iter);
+        result
     }
 }
 

@@ -1,6 +1,6 @@
 use num_traits::Zero;
 
-use super::{binary_search::binary_search, stream_defs::{FromStreamIterator, IndexedStream, IntoStreamIterator, StreamResult}};
+use super::{binary_search::binary_search, stream_defs::{ExtendFromStreamIterator, FromStreamIterator, IndexedStream, IntoStreamIterator, StreamResult}};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SparseVec<I, T> {
@@ -183,20 +183,22 @@ impl<'a, I: Ord + Copy, T> IntoStreamIterator for &'a SparseVec<I, T> {
     }
 }
 
+impl<I: Ord + Clone, T> ExtendFromStreamIterator<I, T> for SparseVec<I, T> {
+    fn extend_from_stream_iterator(&mut self, iter: impl IndexedStream<I=I, V=T>) {
+        iter.for_each(|i, v| {
+            self.inds.push(i);
+            self.vals.push(v);
+        });
+    }
+}
+
 impl<I: Ord + Clone, T> FromStreamIterator<I, T> for SparseVec<I, T> {
-    fn from_stream_iterator<Iter: IndexedStream<I=I, V=T>>(iter: Iter) -> Self {
+    fn from_stream_iterator(iter: impl IndexedStream<I=I, V=T>) -> Self {
         let mut result = SparseVec {
             inds: Vec::new(),
             vals: Vec::new(),
         };
         result.extend_from_stream_iterator(iter);
         result
-    }
-
-    fn extend_from_stream_iterator<Iter: IndexedStream<I=I, V=T>>(&mut self, iter: Iter) {
-        iter.for_each(|i, v| {
-            self.inds.push(i);
-            self.vals.push(v);
-        });
     }
 }
