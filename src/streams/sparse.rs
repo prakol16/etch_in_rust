@@ -95,6 +95,7 @@ struct FlatVec<T> {
     data: T
 }
 
+#[derive(Debug)]
 struct FlatVecView<'a, T: VecLike<'a>> {
     boundaries: &'a [usize],
     data: T::View
@@ -272,12 +273,15 @@ impl<'a, I: Copy, T: VecLike<'a>> SliceLike for SparseIndexView<'a, I, T> {
 }
 
 impl<'a, I: Copy, T: VecLike<'a>> MutVecLike for SparseIndexMutView<'a, I, T> {
-    type OwnedElem = I;
-    type MutElem = T::MutView;
+    type OwnedElem = (I, <T::MutView as MutVecLike>::OwnedElem);
+    type MutElem = <T::MutView as MutVecLike>::MutElem;
     
-    fn emplace_back(&mut self, construct: impl FnOnce(&mut Self::MutElem) -> I) {
-        let index = construct(&mut self.data);
-        self.inds.push(index);
+    fn emplace_back(&mut self, construct: impl FnOnce(&mut Self::MutElem) -> Self::OwnedElem) {
+        self.data.emplace_back(|v| {
+            let (index, x) = construct(v);
+            self.inds.push(index);
+            x
+        });
     }
     
     fn size(&self) -> usize {
@@ -356,9 +360,148 @@ impl<'a, I, T> IndexedStream for SparseIndexIterator<'a, I, T>
 
 #[cfg(test)]
 mod tests {
-    use super::WithSparseIndices;
-    use crate::streams::stream_defs::IntoStreamIterator;
+    use std::vec;
 
+    use super::{DenseVec, FlatVec, MutVecLike, SparseVec, VecLike, WithSparseIndices};
+    use crate::streams::{sparse::SliceLike, stream_defs::IntoStreamIterator};
+
+    #[test]
     fn test_basic() {
+        let mut vec_2d: FlatVec<Vec<i32>> = FlatVec::empty();
+        vec_2d.to_mut_view().emplace_back(|v| {
+            v.push(3);
+            v.push(4);
+            v.push(10);
+        });
+        vec_2d.to_mut_view().emplace_back(|v| {
+            v.push(5);
+        });
+        vec_2d.to_mut_view().emplace_back(|v| {
+            v.push(7);
+            v.push(8);
+        });
+        assert_eq!(vec_2d.to_view().size(), 3);
+        assert_eq!(vec_2d.to_view().get(0), &[3, 4, 10]);
+        assert_eq!(vec_2d.to_view().get(1), &[5]);
+        assert_eq!(vec_2d.to_view().get(2), &[7, 8]);
+        assert_eq!(vec_2d.to_mut_view().size(), 3);
+
+        let slice = vec_2d.to_view().slice(1, 1);
+        assert_eq!(slice.size(), 1);
+        assert_eq!(slice.get(0), &[5]);
+    }
+
+    #[test]
+    fn test_sparse_1d() {
+        let mut vec_1d: WithSparseIndices<isize, Vec<u32>> = WithSparseIndices::empty();
+        vec_1d.to_mut_view().emplace_back(|_| { (100, 3u32) });
+        vec_1d.to_mut_view().emplace_back(|_| { (200, 5u32) });
+        vec_1d.to_mut_view().emplace_back(|_| { (300, 7u32) });
+        assert_eq!(vec_1d.to_view().size(), 3);
+        assert_eq!(vec_1d.to_view().get(0), (100, &3u32));
+        assert_eq!(vec_1d.to_view().get(1), (200, &5u32));
+        assert_eq!(vec_1d.to_view().get(2), (300, &7u32));
+    }
+
+    #[test]
+    fn test_sparse_csr_mat() {
+        let mut vec_2d: SparseVec<isize, Vec<i32>> = WithSparseIndices::empty();
+        vec_2d.to_mut_view().emplace_back(|v| {
+            v.push(3);
+            v.push(4);
+            v.push(10);
+            return (100, ());
+        });
+        vec_2d.to_mut_view().emplace_back(|v| {
+            v.push(5);
+            return (200, ());
+        });
+        vec_2d.to_mut_view().emplace_back(|v| {
+            v.push(7);
+            v.push(8);
+            return (300, ());
+        });
+        assert_eq!(vec_2d.to_view().size(), 3);
+        assert_eq!(vec_2d.to_view().get(0), (100, &[3i32, 4, 10] as &[i32]));
+        assert_eq!(vec_2d.to_view().get(1), (200, &[5] as &[i32]));
+        assert_eq!(vec_2d.to_view().get(2), (300, &[7, 8] as &[i32]));
+        assert_eq!(vec_2d.to_mut_view().size(), 3);
+    }
+
+    #[test]
+    fn test_deeply_nested() {
+        // An dense array of sparse csr matrices.
+        let mut vec_3d: DenseVec<SparseVec<i32, Vec<u32>>> = DenseVec::empty();
+        vec_3d.to_mut_view().emplace_back(|v| {
+            // Insert a sparse matrix in the 0th position
+            v.emplace_back(|v| {
+                v.push(3);
+                v.push(4);
+                v.push(10);
+                return (100, ());
+            });
+            v.emplace_back(|v| {
+                v.push(5);
+                return (200, ());
+            });
+        });
+        vec_3d.to_mut_view().emplace_back(|v| {
+            // Insert a sparse matrix in the 1st position
+            v.emplace_back(|v| {
+                v.push(7);
+                v.push(8);
+                return (300, ());
+            });
+        });
+        assert_eq!(vec_3d.to_view().size(), 2);
+        assert_eq!(vec_3d.to_view().get(0).size(), 2);
+        assert_eq!(vec_3d.to_view().get(1).size(), 1);
+        assert_eq!(vec_3d.to_view().get(0).get(0), (100, &[3u32, 4, 10] as &[u32]));
+        assert_eq!(vec_3d.to_view().get(0).get(1), (200, &[5u32] as &[u32]));
+        assert_eq!(vec_3d.to_view().get(1).get(0), (300, &[7u32, 8] as &[u32]));
+    }
+
+    fn test_dcsr_mat() {
+        let mut vec_2d: SparseVec<isize, WithSparseIndices<usize, Vec<i32>>> = WithSparseIndices::empty();
+        vec_2d.to_mut_view().emplace_back(|v| {
+            v.emplace_back(|v| {
+                return (50, -3i32);
+            });
+            v.emplace_back(|v| {
+                return (100, -4i32);
+            });
+            v.emplace_back(|v| {
+                return (200, -10i32);
+            });
+            return (1000, ());
+        });
+        vec_2d.to_mut_view().emplace_back(|v| {
+            v.emplace_back(|v| {
+                return (300, -5i32);
+            });
+            return (2000, ());
+        });
+        vec_2d.to_mut_view().emplace_back(|v| {
+            v.emplace_back(|v| {
+                return (400, -7i32);
+            });
+            v.emplace_back(|v| {
+                return (500, -8i32);
+            });
+            return (3000, ());
+        });
+        assert_eq!(vec_2d.to_view().size(), 3);
+        assert_eq!(vec_2d.to_view().get(0).0, 1000);
+        assert_eq!(vec_2d.to_view().get(0).1.size(), 3);
+        assert_eq!(vec_2d.to_view().get(0).1.get(0), (50, &-3i32));
+        assert_eq!(vec_2d.to_view().get(0).1.get(1), (100, &-4i32));
+        assert_eq!(vec_2d.to_view().get(0).1.get(2), (200, &-10i32));
+        assert_eq!(vec_2d.to_view().get(1).0, 2000);
+        assert_eq!(vec_2d.to_view().get(1).1.size(), 1);
+        assert_eq!(vec_2d.to_view().get(1).1.get(0), (300, &-5i32));
+        assert_eq!(vec_2d.to_view().get(2).0, 3000);
+        assert_eq!(vec_2d.to_view().get(2).1.size(), 2);
+        assert_eq!(vec_2d.to_view().get(2).1.get(0), (400, &-7i32));
+        assert_eq!(vec_2d.to_view().get(2).1.get(1), (500, &-8i32));
     }
 }
