@@ -16,20 +16,27 @@ trait SliceLike {
 }
 
 
+trait MutVecLike {
+    type OwnedElem;
+    type MutElem;
+
+    fn emplace_back(&mut self, construct: impl FnOnce(&mut Self::MutElem) -> Self::OwnedElem);
+
+    fn size(&self) -> usize;
+}
+
 // A type T implements VecLike
 // if we can view it as a SliceLike object
 // that has the same lifetime as the object.
 trait VecLike<'a>: 'a {
-    type OwnedElem;
     type View: SliceLike + Clone;
+    type MutView: MutVecLike;
 
     fn empty() -> Self;
 
     fn to_view(&'a self) -> Self::View;
 
-    fn push(&'a mut self, elem: Self::OwnedElem);
-
-    fn extend_self(&'a mut self, elems: Self);
+    fn to_mut_view(&'a mut self) -> Self::MutView;
 }
 
 impl<'a, T> SliceLike for &'a [T] {
@@ -48,9 +55,22 @@ impl<'a, T> SliceLike for &'a [T] {
     }
 }
 
-impl<'a, T: 'a> VecLike<'a> for Vec<T> {
+impl<'a, T> MutVecLike for &'a mut Vec<T> {
     type OwnedElem = T;
+    type MutElem = ();
+    
+    fn emplace_back(&mut self, construct: impl FnOnce(&mut Self::MutElem) -> Self::OwnedElem) {
+        self.push(construct(&mut ()));
+    }
+
+    fn size(&self) -> usize {
+        self.len()
+    }
+}
+
+impl<'a, T: 'a> VecLike<'a> for Vec<T> {
     type View = &'a [T];
+    type MutView = &'a mut Vec<T>;
     
     fn empty() -> Self {
         Vec::new()
@@ -60,17 +80,13 @@ impl<'a, T: 'a> VecLike<'a> for Vec<T> {
         self.as_slice()
     }
 
-    fn push(&mut self, elem: Self::OwnedElem) {
-        self.push(elem);
-    }
-
-    fn extend_self(&mut self, elems: Self) {
-        self.extend(elems.into_iter());
+    fn to_mut_view(&'a mut self) -> Self::MutView {
+        self
     }
 }
 
 // A FlatVec<T>, where T: VecLike, represents
-// a Vec<T> ~ Vec<Vec<T::OwnedElem>> (since T represents a Vec<T::OwnedElem>) in a flattened way.
+// a Vec<T> ~ Vec<Vec<T::Elem>> (since T represents a Vec<T::OwnedElem>) in a flattened way.
 #[derive(Debug, Clone)]
 struct FlatVec<T> {
     // Vector of boundaries, starts with 0.
@@ -82,6 +98,11 @@ struct FlatVec<T> {
 struct FlatVecView<'a, T: VecLike<'a>> {
     boundaries: &'a [usize],
     data: T::View
+}
+
+struct FlatVecMutView<'a, T: VecLike<'a>> {
+    boundaries: &'a mut Vec<usize>,
+    data: T::MutView
 }
 
 impl<'a, T: VecLike<'a>> Clone for FlatVecView<'a, T>
@@ -130,8 +151,22 @@ impl<'a, T: VecLike<'a>> SliceLike for FlatVecView<'a, T> {
     }
 }
 
+impl<'a, T: VecLike<'a>> MutVecLike for FlatVecMutView<'a, T> {
+    type OwnedElem = ();
+    type MutElem = T::MutView;
+    
+    fn emplace_back(&mut self, construct: impl FnOnce(&mut Self::MutElem)) {
+        construct(&mut self.data);
+        self.boundaries.push(self.data.size());
+    }
+
+    fn size(&self) -> usize {
+        self.boundaries.len() - 1
+    }
+}
+
 impl<'a, T: for<'b> VecLike<'b>> VecLike<'a> for FlatVec<T> {
-    type OwnedElem = T;
+    type MutView = FlatVecMutView<'a, T>;
     type View = FlatVecView<'a, T>;
 
     fn empty() -> Self {
@@ -147,19 +182,12 @@ impl<'a, T: for<'b> VecLike<'b>> VecLike<'a> for FlatVec<T> {
             data: self.data.to_view()
         }
     }
-
-    fn push(&'a mut self, elem: Self::OwnedElem) {
-        let size = self.data.to_view().size();
-        self.boundaries.push(size);
-        self.data.extend_self(elem);
-    }
-
-    fn extend_self(&'a mut self, elems: Self) {
-        let size = self.data.to_view().size();
-        self.boundaries.extend(
-            elems.boundaries[1..]
-            .iter().map(|&i| i + size));
-        self.data.extend_self(elems.data);
+    
+    fn to_mut_view(&'a mut self) -> Self::MutView {
+        FlatVecMutView {
+            boundaries: &mut self.boundaries,
+            data: self.data.to_mut_view()
+        }
     }
 }
 
@@ -209,6 +237,11 @@ struct SparseIndexView<'a, I, T: VecLike<'a>> {
     data: T::View
 }
 
+struct SparseIndexMutView<'a, I, T: VecLike<'a>> {
+    inds: &'a mut Vec<I>,
+    data: T::MutView
+}
+
 impl<'a, I, T: VecLike<'a>> Clone for SparseIndexView<'a, I, T>
         where T::View: Clone {
     fn clone(&self) -> Self {
@@ -238,8 +271,22 @@ impl<'a, I: Copy, T: VecLike<'a>> SliceLike for SparseIndexView<'a, I, T> {
     }
 }
 
+impl<'a, I: Copy, T: VecLike<'a>> MutVecLike for SparseIndexMutView<'a, I, T> {
+    type OwnedElem = I;
+    type MutElem = T::MutView;
+    
+    fn emplace_back(&mut self, construct: impl FnOnce(&mut Self::MutElem) -> I) {
+        let index = construct(&mut self.data);
+        self.inds.push(index);
+    }
+    
+    fn size(&self) -> usize {
+        self.inds.len()
+    }
+}
+
 impl<'a, I: 'a + Copy, T: VecLike<'a>> VecLike<'a> for WithSparseIndices<I, T> {
-    type OwnedElem = (I, T::OwnedElem);
+    type MutView = SparseIndexMutView<'a, I, T>;
     type View = SparseIndexView<'a, I, T>;
 
     fn empty() -> Self {
@@ -255,15 +302,12 @@ impl<'a, I: 'a + Copy, T: VecLike<'a>> VecLike<'a> for WithSparseIndices<I, T> {
             data: self.data.to_view()
         }
     }
-
-    fn push(&'a mut self, (index, elem): Self::OwnedElem) {
-        self.inds.push(index);
-        self.data.push(elem);
-    }
-
-    fn extend_self(&'a mut self, elems: Self) {
-        self.inds.extend(elems.inds);
-        self.data.extend_self(elems.data);
+    
+    fn to_mut_view(&'a mut self) -> Self::MutView {
+        SparseIndexMutView {
+            inds: &mut self.inds,
+            data: self.data.to_mut_view()
+        }
     }
 }
 
